@@ -14,6 +14,7 @@ typedef enum {
 typedef struct {
   Rectangle view;
   Rectangle currentRect;
+  Rectangle lastSplit;
   SlideSplitDirection direction;
 } SlideSplit;
 
@@ -25,10 +26,20 @@ typedef struct {
 } Slide;
 
 int SlideBegin(Slide* s, float padding);
-int SlideBeginBiasedSplit(Slide* s, int splitDirection, float bias);
-int SlideBeginSplit(Slide* s, int splitDirection);
-int SlideNextSplit(Slide* s);
-int SlideEndSplit(Slide* s);
-Rectangle SlideCurrentRect(Slide* s);
+
+static inline Rectangle SlideSplitRect(Slide* s) {
+  return s->activeSplit.lastSplit;
+}
+
+int SlideSplitByPercent(Slide* s, float perc);
+int SlideSplitBySize(Slide* s, int pixels);
+int SlideSplitHalf(Slide* s);
+int SlideSplitRemaining(Slide* s);
+
+int _SlideBeginSplit(Slide* s, int splitDirection);
+int _SlideEndSplit(Slide* s);
+
+#define SlideSplit(s, direction) \
+  for (int i = _SlideBeginSplit(s, direction); i; i = _SlideEndSplit(s))
 
 #endif
