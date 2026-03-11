@@ -4,16 +4,48 @@
 
 extern struct _SlideShow SlideShow;
 extern const struct _SlideShowFonts SlideShowFonts;
+extern const struct _SlideShowFontSizes SlideShowFontSizes;
+extern const struct _SlideShowColors SlideShowColors;
 
 typedef struct {
   Font normal, monospaced, title;
 } TextFonts;
 
 static TextFonts Fonts;
+static struct _SlideShowFontSizes FontSizes;
+static struct _SlideShowColors CurrentColors;
 
 Font SlideShowGetMonospacedFont(void) { return Fonts.monospaced; }
-Font SlideShowGetNormalFont(void)     { return Fonts.normal; }
-Font SlideShowGetTitleFont(void)      { return Fonts.title; }
+Font SlideShowGetNormalFont(void)     { return Fonts.normal;     }
+Font SlideShowGetTitleFont(void)      { return Fonts.title;      }
+
+Color SlideShowGetAccentColor(void)     { return CurrentColors.accent;     }
+Color SlideShowGetPrimaryColor(void)    { return CurrentColors.primary;    }
+Color SlideShowGetSecondaryColor(void)  { return CurrentColors.secondary;  }
+Color SlideShowGetBackgroundColor(void) { return CurrentColors.background; }
+
+size_t SlideShowGetTextFontSize(void)  { return FontSizes.text;  }
+size_t SlideShowGetTitleFontSize(void) { return FontSizes.title; }
+
+void SlideShowSetFontSizes(size_t text, size_t title) {
+  FontSizes.text = text;
+  FontSizes.title = title;
+}
+
+void SlideShowResetFontSizes(void) {
+  FontSizes = SlideShowFontSizes;
+}
+
+void SlideShowSetColors(Color background, Color secondary, Color primary, Color accent) {
+  CurrentColors.background = background;
+  CurrentColors.secondary = secondary;
+  CurrentColors.primary = primary;
+  CurrentColors.accent = accent;
+}
+
+void SlideShowResetColors(void) {
+  CurrentColors = SlideShowColors;
+}
 
 static Font LoadFontOrGetDefault(const char* fontPath) {
   if (fontPath == NULL)
@@ -67,6 +99,7 @@ static int DrawSlide(size_t slideIndex) {
     return 0;
   }
 
+  ClearBackground(CurrentColors.background);
   struct _SlideDef* slide = &SlideShow.slides[slideIndex];
   return slide->draw(slide->data, slideIndex + 1);
 }
@@ -93,6 +126,9 @@ int main(void) {
 
   LoadFonts();
   InitSlides();
+
+  SlideShowResetFontSizes();
+  SlideShowResetColors();
 
   currentSlide = 0;
   while (!WindowShouldClose()) {
