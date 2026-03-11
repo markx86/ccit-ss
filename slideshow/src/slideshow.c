@@ -1,0 +1,113 @@
+#include <slideshow/slideshow.h>
+
+#include <raylib.h>
+
+extern struct _SlideShow SlideShow;
+extern const struct _SlideShowFonts SlideShowFonts;
+
+typedef struct {
+  Font normal, monospaced, title;
+} TextFonts;
+
+static TextFonts Fonts;
+
+Font SlideShowGetMonospacedFont(void) { return Fonts.monospaced; }
+Font SlideShowGetNormalFont(void)     { return Fonts.normal; }
+Font SlideShowGetTitleFont(void)      { return Fonts.title; }
+
+static Font LoadFontOrGetDefault(const char* fontPath) {
+  if (fontPath == NULL)
+    return GetFontDefault();
+
+  Font font = LoadFont(fontPath);
+  /* Set bilinear filtering */
+  GenTextureMipmaps(&font.texture);
+  SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
+  return font;
+}
+
+static void LoadFonts(void) {
+  Fonts.normal     = LoadFontOrGetDefault(SlideShowFonts.normal);
+  Fonts.monospaced = LoadFontOrGetDefault(SlideShowFonts.monospaced);
+  Fonts.title      = LoadFontOrGetDefault(SlideShowFonts.title);
+}
+
+static int IsKeyPressedOrRepeated(int key) {
+  return IsKeyPressed(key) || IsKeyPressedRepeat(key);
+}
+
+static void InitSlides(void) {
+  struct _SlideDef* slide;
+  for (size_t i = 0; i < SlideShow.numSlides; ++i) {
+    slide = &SlideShow.slides[i];
+    if (slide->init != NULL)
+      slide->data = slide->init();
+    else
+      slide->data = NULL;
+  }
+}
+
+static void FreeSlides(void) {
+  struct _SlideDef* slide;
+  for (size_t i = 0; i < SlideShow.numSlides; ++i) {
+    slide = &SlideShow.slides[i];
+    if (slide->free != NULL)
+      slide->free(slide->data);
+  }
+}
+
+static void EndSlide(void) {
+  ClearBackground(BLACK);
+  DrawTextEx(Fonts.normal, "End of the presentation.", (Vector2) { 32, 32 }, 32, 1, RAYWHITE);
+}
+
+static int DrawSlide(size_t slideIndex) {
+  if (slideIndex >= SlideShow.numSlides) {
+    EndSlide();
+    return 0;
+  }
+
+  struct _SlideDef* slide = &SlideShow.slides[slideIndex];
+  return slide->draw(slide->data, slideIndex + 1);
+}
+
+static void SlideShowInput(size_t* currentSlide) {
+  if /**/ (IsKeyPressedOrRepeated(KEY_LEFT)
+           && *currentSlide > 0)
+    --(*currentSlide);
+  else if (IsKeyPressedOrRepeated(KEY_RIGHT)
+           && *currentSlide < SlideShow.numSlides)
+    ++(*currentSlide);
+
+  if /**/ (IsKeyPressed(KEY_HOME))
+    *currentSlide = 0;
+  else if (IsKeyPressed(KEY_END))
+    *currentSlide = SlideShow.numSlides - 1;
+}
+
+int main(void) {
+  size_t currentSlide;
+
+  SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
+  InitWindow(800, 600, "Software Security 0");
+
+  LoadFonts();
+  InitSlides();
+
+  currentSlide = 0;
+  while (!WindowShouldClose()) {
+    BeginDrawing();
+
+    if (!DrawSlide(currentSlide))
+      SlideShowInput(&currentSlide);
+
+    if (IsKeyPressed(KEY_F11))
+      ToggleFullscreen();
+
+    EndDrawing();
+  }
+
+  FreeSlides();
+  CloseWindow();
+  return 0;
+}
