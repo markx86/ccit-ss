@@ -143,10 +143,10 @@ int SlideBeginWithTitle(Slide* s, float padding, const char* title) {
   if (!SlideBeginSplit(s, SLIDE_SPLIT_VERTICAL))
     return 0;
 
-  if (SlideSplitBySize(s, titleSize.y)) {
+  if (SlideSplitBySize(s, titleSize.y * 2)) {
     Rectangle r = SlideSplitRect(s);
     Vector2 pos = {
-      r.x,
+      r.x + 64.0f,
       r.y + (r.height - titleSize.y) * 0.5f
     };
     DrawTextSDF(font, title, pos, fontSize, 1, SlideShowGetPrimaryColor());
