@@ -1,3 +1,4 @@
+#include <components/sdf-font.h>
 #include <slideshow/slideshow.h>
 
 #include <raylib.h>
@@ -50,12 +51,8 @@ void SlideShowResetColors(void) {
 static Font LoadFontOrGetDefault(const char* fontPath) {
   if (fontPath == NULL)
     return GetFontDefault();
-
-  Font font = LoadFont(fontPath);
-  /* Set bilinear filtering */
-  GenTextureMipmaps(&font.texture);
-  SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
-  return font;
+  else
+    return LoadFontSDF(fontPath);
 }
 
 static void LoadFonts(void) {
@@ -90,7 +87,7 @@ static void FreeSlides(void) {
 
 static void EndSlide(void) {
   ClearBackground(BLACK);
-  DrawTextEx(Fonts.normal, "End of the presentation.", (Vector2) { 32, 32 }, 32, 1, RAYWHITE);
+  DrawTextSDF(Fonts.normal, "End of the presentation.", (Vector2) { 32, 32 }, 32, 1, RAYWHITE);
 }
 
 static int DrawSlide(size_t slideIndex) {
@@ -124,6 +121,7 @@ int main(void) {
   SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
   InitWindow(800, 600, "Software Security 0");
 
+  LoadSDFShader();
   LoadFonts();
   InitSlides();
 
@@ -144,6 +142,7 @@ int main(void) {
   }
 
   FreeSlides();
+  UnloadSDFShader();
   CloseWindow();
   return 0;
 }

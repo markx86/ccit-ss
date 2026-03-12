@@ -1,5 +1,6 @@
 #include <components/code-editor.h>
 
+#include <components/sdf-font.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -488,12 +489,12 @@ static void RenderLines(CodeEditor* codeEditor) {
     snprintf(codeEditor->printBuffer, codeEditor->printBufferLength,
              " %3d  %.*s", i + 1, line->length, line->chars);
 
-    DrawTextEx(codeEditor->font,
-               codeEditor->printBuffer,
-               linePos,
-               codeEditor->fontSize,
-               codeEditor->spacing,
-               DARKGRAY);
+    DrawTextSDF(codeEditor->font,
+                codeEditor->printBuffer,
+                linePos,
+                codeEditor->fontSize,
+                codeEditor->spacing,
+                DARKGRAY);
 
     linePos.y += lineHeight;
     line = line->next;
