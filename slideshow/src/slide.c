@@ -1,24 +1,22 @@
+#include <components/sdf-font.h>
 #include <slideshow/slide.h>
 #include <slideshow/slideshow.h>
 
-static void SetActiveSplitView(Slide* s, Rectangle r) {
-  s->activeSplit.view.x = r.x;
-  s->activeSplit.view.y = r.y;
-  s->activeSplit.view.width = r.width;
-  s->activeSplit.view.height = r.height;
-}
-
-static void InitCurrentRect(Slide* s) {
-  s->activeSplit.lastSplit = s->activeSplit.view;
-  s->activeSplit.currentRect = s->activeSplit.view;
+static void InitActiveSplit(Slide* s, Rectangle view, SlideSplitDirection direction) {
+  s->activeSplit.view = view;
+  s->activeSplit.freeRect = view;
+  s->activeSplit.direction = direction;
   switch (s->activeSplit.direction) {
     case SLIDE_SPLIT_VERTICAL:
-      s->activeSplit.lastSplit.height = 0.0f;
+      s->activeSplit.lastRect.width = view.width;
+      s->activeSplit.lastRect.height = 0.0f;
       break;
     case SLIDE_SPLIT_HORIZONTAL:
-      s->activeSplit.lastSplit.width = 0.0f;
+      s->activeSplit.lastRect.width = 0.0f;
+      s->activeSplit.lastRect.height = view.height;
       break;
     default:
+      s->activeSplit.lastRect = view;
       break;
   }
 }
@@ -36,10 +34,7 @@ int SlideBegin(Slide* s, float padding) {
 
   s->padding = padding;
   s->numActiveSplits = 0;
-  s->activeSplit.direction = SLIDE_SPLIT_NONE;
-  SetActiveSplitView(s, view);
-  InitCurrentRect(s);
-  s->activeSplit.currentRect = s->activeSplit.view;
+  InitActiveSplit(s, view, SLIDE_SPLIT_NONE);
 
   return 1;
 }
@@ -65,36 +60,36 @@ static int SplitCurrentRect(Slide* s, float w, float h) {
       return 0;
     case SLIDE_SPLIT_VERTICAL:
       split = (Rectangle) {
-        s->activeSplit.currentRect.x,
-        s->activeSplit.currentRect.y,
-        s->activeSplit.currentRect.width,
+        s->activeSplit.freeRect.x,
+        s->activeSplit.freeRect.y,
+        s->activeSplit.freeRect.width,
         h
       };
       newRect = (Rectangle) {
         split.x,
         split.y + h + s->padding,
-        s->activeSplit.currentRect.width,
-        s->activeSplit.currentRect.height - h - s->padding,
+        s->activeSplit.freeRect.width,
+        s->activeSplit.freeRect.height - h - s->padding,
       };
       break;
     case SLIDE_SPLIT_HORIZONTAL:
       split = (Rectangle) {
-        s->activeSplit.currentRect.x,
-        s->activeSplit.currentRect.y,
+        s->activeSplit.freeRect.x,
+        s->activeSplit.freeRect.y,
         w,
-        s->activeSplit.currentRect.height
+        s->activeSplit.freeRect.height
       };
       newRect = (Rectangle) {
         split.x + w + s->padding,
         split.y,
-        s->activeSplit.currentRect.width - w - s->padding,
-        s->activeSplit.currentRect.height,
+        s->activeSplit.freeRect.width - w - s->padding,
+        s->activeSplit.freeRect.height,
       };
       break;
   }
 
-  s->activeSplit.lastSplit = split;
-  s->activeSplit.currentRect = newRect;
+  s->activeSplit.lastRect = split;
+  s->activeSplit.freeRect = newRect;
 
   return    split.x >= s->activeSplit.view.x && split.x + split.width  <= s->activeSplit.view.x + s->activeSplit.view.width
          && split.y >= s->activeSplit.view.y && split.y + split.height <= s->activeSplit.view.y + s->activeSplit.view.height;
@@ -102,8 +97,8 @@ static int SplitCurrentRect(Slide* s, float w, float h) {
 
 int SlideSplitByPercent(Slide* s, float perc) {
   return SplitCurrentRect(s,
-                          s->activeSplit.currentRect.width * perc - s->padding * 0.5f,
-                          s->activeSplit.currentRect.height * perc - s->padding * 0.5f);
+                          s->activeSplit.freeRect.width * perc - s->padding * 0.5f,
+                          s->activeSplit.freeRect.height * perc - s->padding * 0.5f);
 }
 
 int SlideSplitBySize(Slide* s, int pixels) {
@@ -115,24 +110,48 @@ int SlideSplitHalf(Slide* s) {
 }
 
 int SlideSplitRemaining(Slide* s) {
-  return SplitCurrentRect(s, s->activeSplit.currentRect.width, s->activeSplit.currentRect.height);
+  return SplitCurrentRect(s, s->activeSplit.freeRect.width, s->activeSplit.freeRect.height);
 }
 
-int _SlideBeginSplit(Slide* s, int splitDirection) {
-  Rectangle view = s->activeSplit.lastSplit;
+int SlideBeginSplit(Slide* s, int splitDirection) {
+  Rectangle view = s->activeSplit.lastRect;
   if (!PushSplit(s))
     return 0;
 
-  s->activeSplit.view = view;
-  s->activeSplit.direction = splitDirection;
-  InitCurrentRect(s);
-
+  InitActiveSplit(s, view, splitDirection);
   return 1;
 }
 
-int _SlideEndSplit(Slide* s) {
+int SlideEndSplit(Slide* s) {
   PopSplit(s);
   return 0;
 }
 
+void SlideRebaseOnSplit(Slide* s) {
+  s->numActiveSplits = 0;
+  InitActiveSplit(s, s->activeSplit.freeRect, SLIDE_SPLIT_NONE);
+}
+
+int SlideBeginWithTitle(Slide* s, float padding, const char* title) {
+  if (!SlideBegin(s, padding))
+    return 0;
+
+  Font font = SlideShowGetTitleFont();
+  int fontSize = SlideShowGetTitleFontSize();
+  Vector2 titleSize = MeasureTextEx(font, title, fontSize, 1);
+
+  if (!SlideBeginSplit(s, SLIDE_SPLIT_VERTICAL))
+    return 0;
+
+  if (SlideSplitBySize(s, titleSize.y)) {
+    Rectangle r = SlideSplitRect(s);
+    Vector2 pos = {
+      r.x,
+      r.y + (r.height - titleSize.y) * 0.5f
+    };
+    DrawTextSDF(font, title, pos, fontSize, 1, SlideShowGetPrimaryColor());
+  }
+
+  SlideRebaseOnSplit(s);
+  return 1;
 }

@@ -86,7 +86,7 @@ Color SlideShowGetBackgroundColor(void);
   SLIDESHOW_FONTS(DEFAULT_FONT, DEFAULT_FONT, DEFAULT_FONT)
 
 #define DEFAULT_FONT_SIZE_TEXT  24
-#define DEFAULT_FONT_SIZE_TITLE 48
+#define DEFAULT_FONT_SIZE_TITLE 72
 
 #define SLIDESHOW_FONT_SIZES(_text, _title)               \
   const struct _SlideShowFontSizes SlideShowFontSizes = { \
