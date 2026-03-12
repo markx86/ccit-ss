@@ -1,5 +1,6 @@
-#include <components/sdf-font.h>
 #include <slideshow/slideshow.h>
+#include <components/sdf-font.h>
+#include <components/pak.h>
 
 #include <raylib.h>
 
@@ -121,6 +122,7 @@ int main(void) {
   SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
   InitWindow(800, 600, "Software Security 0");
 
+  LoadPakFile();
   LoadSDFShader();
   LoadFonts();
   InitSlides();
@@ -143,6 +145,8 @@ int main(void) {
 
   FreeSlides();
   UnloadSDFShader();
+  UnloadPakFile();
+
   CloseWindow();
   return 0;
 }

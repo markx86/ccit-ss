@@ -47,6 +47,8 @@ endif()
 
 include_directories(BEFORE SYSTEM include/)
 
+include(cmake/ResPak.cmake)
+
 add_subdirectory(debugger)
 add_subdirectory(components)
 add_subdirectory(slideshow)
