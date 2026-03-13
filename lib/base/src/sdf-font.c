@@ -1,6 +1,8 @@
-#include <components/sdf-font.h>
+#include <base/sdf-font.h>
+
 #include <stddef.h>
 
+/* NOTE: This file has been stolen from raylib's SDF example */
 static const char* sdfFragmentShader =
   "#version 330\n"
   "// Input vertex attributes (from vertex shader)\n"

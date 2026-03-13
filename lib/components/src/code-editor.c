@@ -1,6 +1,7 @@
 #include <components/code-editor.h>
 
-#include <components/sdf-font.h>
+#include <base/sdf-font.h>
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

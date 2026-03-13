@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.25)
-project(ccit-slides)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -45,10 +44,6 @@ else()
   add_compile_options(-O3 -Werror)
 endif()
 
-include_directories(BEFORE SYSTEM include/)
-
 include(cmake/ResPak.cmake)
 
-add_subdirectory(debugger)
-add_subdirectory(components)
-add_subdirectory(slideshow)
+add_subdirectory(lib)

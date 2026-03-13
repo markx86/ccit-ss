@@ -1,6 +1,7 @@
 #include <slideshow/slideshow.h>
-#include <components/sdf-font.h>
-#include <components/pak.h>
+
+#include <base/sdf-font.h>
+#include <base/pak.h>
 
 #include <raylib.h>
 

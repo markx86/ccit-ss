@@ -1,6 +1,7 @@
-#include <components/sdf-font.h>
 #include <slideshow/slide.h>
 #include <slideshow/slideshow.h>
+
+#include <base/sdf-font.h>
 
 static void InitActiveSplit(Slide* s, Rectangle view, SlideSplitDirection direction) {
   s->activeSplit.view = view;
