@@ -2,6 +2,8 @@
 #include <slideshow/slideshow.h>
 
 #include <base/sdf-font.h>
+#include <stdlib.h>
+#include <string.h>
 
 static void InitActiveSplit(Slide* s, Rectangle view, SlideSplitDirection direction) {
   s->activeSplit.view = view;
@@ -156,3 +158,74 @@ int SlideBeginWithTitle(Slide* s, float padding, const char* title) {
   SlideRebaseOnSplit(s);
   return 1;
 }
+
+void SlideText(Slide* s, const char* txt, Color tint) {
+  Font font = SlideShowGetTextFont();
+  int fontSize = SlideShowGetTextFontSize();
+  Rectangle rect = SlideSplitRect(s);
+  const float lineHeight = fontSize + 4.0f;
+  const float spaceWidth = MeasureTextEx(font, " ", fontSize, 1.0f).x;
+
+  BeginScissorMode(rect.x, rect.y, rect.width, rect.height);
+
+  char *text = strdup(txt), *textEnd = text + strlen(text);
+
+  /* Split text into lines first */
+  char* p = text - 1;
+  while ((p = strpbrk(p + 1, "\n")) != NULL)
+    *p = '\0';
+
+  float lineY = rect.y;
+  /* For every line in the text */
+  char* lineEnd;
+  for (char* line = text; line < textEnd; line = lineEnd + 1) {
+    float lineWidth = 0.0f;
+    lineEnd = line + strlen(line);
+    /* If the line is empty, increment the next line's Y coordinate and go to the next one */
+    if (lineEnd == line) {
+      lineY += lineHeight;
+      continue;
+    }
+
+    /* Draw text line with wrapping */
+    char* chunk = line;
+    char blankChar = *line;
+    while (blankChar != '\0') {
+      char* chunkEnd = strpbrk(chunk, " ");
+      if (chunkEnd == NULL)
+        chunkEnd = lineEnd;
+
+      blankChar = *chunkEnd;
+      *chunkEnd = '\0';
+      float chunkWidth = *chunk == '\0' ? spaceWidth : MeasureTextEx(font, chunk, fontSize, 1.0f).x;
+      float newLineWidth = chunkWidth + lineWidth;
+      *chunkEnd = blankChar;
+
+      if (newLineWidth >= rect.width) {
+        /* The current line overflows the width of the container, draw the current buffer and continue */
+      draw:
+        chunk[-1] = '\0'; /* `chunk` always points to the first character of this chunk,
+                           * that means that chunk[-1] is the last whitespace
+                           */
+        DrawTextSDF(font, line, (Vector2) { rect.x, lineY }, fontSize, 1.0f, tint);
+        line = chunk;
+        lineY += lineHeight;
+        lineWidth = chunkWidth + spaceWidth;
+      } else if (blankChar == '\0') {
+        /* End of the line, draw the remaining characters */
+        chunk = chunkEnd + 1;
+        goto draw;
+      } else {
+        /* The line still fits into the width of the container, keep counting the line width */
+        lineWidth = newLineWidth + spaceWidth;
+      }
+
+      chunk = chunkEnd + 1;
+    }
+  }
+
+  EndScissorMode();
+
+  free(text);
+}
+

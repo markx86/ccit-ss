@@ -41,6 +41,8 @@ int  SlideBeginSplit(Slide* s, int splitDirection);
 int  SlideEndSplit(Slide* s);
 void SlideRebaseOnSplit(Slide* s);
 
+void SlideText(Slide* s, const char* text, Color tint);
+
 #define SlideSplit(s, direction) \
   for (int i = SlideBeginSplit(s, direction); i; i = SlideEndSplit(s))
 

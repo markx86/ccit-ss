@@ -11,7 +11,7 @@ extern const struct _SlideShowFontSizes SlideShowFontSizes;
 extern const struct _SlideShowColors SlideShowColors;
 
 typedef struct {
-  Font normal, monospaced, title;
+  Font text, monospaced, title;
 } TextFonts;
 
 static TextFonts Fonts;
@@ -19,7 +19,7 @@ static struct _SlideShowFontSizes FontSizes;
 static struct _SlideShowColors CurrentColors;
 
 Font SlideShowGetMonospacedFont(void) { return Fonts.monospaced; }
-Font SlideShowGetNormalFont(void)     { return Fonts.normal;     }
+Font SlideShowGetTextFont(void)       { return Fonts.text;       }
 Font SlideShowGetTitleFont(void)      { return Fonts.title;      }
 
 Color SlideShowGetAccentColor(void)     { return CurrentColors.accent;     }
@@ -58,7 +58,7 @@ static Font LoadFontOrGetDefault(const char* fontPath) {
 }
 
 static void LoadFonts(void) {
-  Fonts.normal     = LoadFontOrGetDefault(SlideShowFonts.normal);
+  Fonts.text     = LoadFontOrGetDefault(SlideShowFonts.text);
   Fonts.monospaced = LoadFontOrGetDefault(SlideShowFonts.monospaced);
   Fonts.title      = LoadFontOrGetDefault(SlideShowFonts.title);
 }
@@ -89,7 +89,7 @@ static void FreeSlides(void) {
 
 static void EndSlide(void) {
   ClearBackground(BLACK);
-  DrawTextSDF(Fonts.normal, "End of the presentation.", (Vector2) { 32, 32 }, 32, 1, RAYWHITE);
+  DrawTextSDF(Fonts.text, "End of the presentation.", (Vector2) { 32, 32 }, 32, 1, RAYWHITE);
 }
 
 static int DrawSlide(size_t slideIndex) {

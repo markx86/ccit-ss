@@ -17,7 +17,7 @@ struct _SlideShow {
 };
 
 struct _SlideShowFonts {
-  const char* normal;
+  const char* text;
   const char* monospaced;
   const char* title;
 };
@@ -35,7 +35,7 @@ struct _SlideShowFontSizes {
 };
 
 Font SlideShowGetMonospacedFont(void);
-Font SlideShowGetNormalFont(void);
+Font SlideShowGetTextFont(void);
 Font SlideShowGetTitleFont(void);
 
 void   SlideShowSetFontSizes(size_t text, size_t title);
@@ -75,11 +75,11 @@ Color SlideShowGetBackgroundColor(void);
 
 #define DEFAULT_FONT NULL
 
-#define SLIDESHOW_FONTS(_normal, _monospaced, _title) \
-  const struct _SlideShowFonts SlideShowFonts = {     \
-    .normal = _normal,                                \
-    .monospaced = _monospaced,                        \
-    .title = _title                                   \
+#define SLIDESHOW_FONTS(_text, _monospaced, _title) \
+  const struct _SlideShowFonts SlideShowFonts = {   \
+    .text = _text,                                  \
+    .monospaced = _monospaced,                      \
+    .title = _title                                 \
   }
 
 #define SLIDESHOW_FONTS_DEFAULT() \
