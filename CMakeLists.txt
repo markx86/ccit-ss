@@ -15,6 +15,9 @@ message(STATUS "Building with '${CMAKE_BUILD_TYPE}' profile")
 set(BUILD_EXAMPLES FALSE)
 set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(thirdparty/raylib)
+target_compile_definitions(raylib PUBLIC
+  -DSUPPORT_FILEFORMAT_JPG
+)
 
 # Build raygui
 add_subdirectory(thirdparty/raygui)

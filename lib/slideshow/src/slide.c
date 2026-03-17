@@ -242,7 +242,16 @@ void SlideText(const char* txt, Color tint) {
   ArenaPop();
 }
 
-void SlideImage(Texture texture) {
+void SlideImage(Texture2D texture) {
   Rectangle rect = SlideSplitRect();
-  /* TODO */
+  float scaleX = rect.width  / (float)texture.width;
+  float scaleY = rect.height / (float)texture.height;
+  float scale  = scaleX > scaleY ? scaleY : scaleX;
+  if (scale > 1.0f)
+    scale = 1.0f;
+  Vector2 pos = {
+    rect.x + (rect.width  - texture.width  * scale) * 0.5f,
+    rect.y + (rect.height - texture.height * scale) * 0.5f,
+  };
+  DrawTextureEx(texture, pos, 0.0f, scale, RAYWHITE);
 }
