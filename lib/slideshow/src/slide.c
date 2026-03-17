@@ -192,6 +192,10 @@ void SlideText(const char* txt, Color tint) {
   /* For every line in the text */
   char* lineEnd;
   for (char* line = text; line < textEnd; line = lineEnd + 1) {
+    /* If the line is outside the rectangle, break out */
+    if (lineY >= rect.y + rect.height)
+      break;
+
     float lineWidth = 0.0f;
     lineEnd = line + strlen(line);
     /* If the line is empty, increment the next line's Y coordinate and go to the next one */
@@ -201,10 +205,10 @@ void SlideText(const char* txt, Color tint) {
     }
 
     /* Draw text line with wrapping */
-    char* chunk = line;
+    char *chunk = line, *chunkEnd = chunk;
     char blankChar = *line;
-    while (blankChar != '\0') {
-      char* chunkEnd = strpbrk(chunk, " ");
+    while (chunkEnd != lineEnd) {
+      chunkEnd = strpbrk(chunk, " ");
       if (chunkEnd == NULL)
         chunkEnd = lineEnd;
 
@@ -216,6 +220,10 @@ void SlideText(const char* txt, Color tint) {
 
       if (newLineWidth >= rect.width) {
         /* The current line overflows the width of the container, draw the current buffer and continue */
+
+        /* NOTE: Sometimes a line can overflow leaving behind the last chunk. This if statement prevents that. */
+        if (blankChar == '\0' && chunkEnd == lineEnd)
+          --chunkEnd;
       draw:
         chunk[-1] = '\0'; /* `chunk` always points to the first character of this chunk,
                            * that means that chunk[-1] is the last whitespace
@@ -224,6 +232,9 @@ void SlideText(const char* txt, Color tint) {
         line = chunk;
         lineY += lineHeight;
         lineWidth = chunkWidth + spaceWidth;
+        /* If the next line won't fit into the rectangle, we can break out */
+        if (lineY >= rect.y + rect.height)
+          goto out;
       } else if (blankChar == '\0') {
         /* End of the line, draw the remaining characters */
         chunk = chunkEnd + 1;
@@ -236,6 +247,7 @@ void SlideText(const char* txt, Color tint) {
       chunk = chunkEnd + 1;
     }
   }
+out:
 
   EndScissorMode();
 
