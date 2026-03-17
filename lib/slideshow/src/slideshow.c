@@ -3,6 +3,7 @@
 #include <base/sdf-font.h>
 #include <base/pak.h>
 #include <base/arena.h>
+#include <base/image.h>
 
 #include <raylib.h>
 
@@ -154,6 +155,7 @@ int main(void) {
   }
 
   FreeSlides();
+  ImageClearCache();
   UnloadSDFShader();
   UnloadPakFile();
 
