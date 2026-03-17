@@ -170,8 +170,7 @@ int SlideBeginWithTitle(float padding, const char* title) {
   return 1;
 }
 
-void SlideText(const char* txt, Color tint) {
-  Font font = SlideShowGetTextFont();
+static void SlideDrawText(Font font, const char* txt, Color tint) {
   int fontSize = SlideShowGetTextFontSize();
   Rectangle rect = SlideSplitRect();
   const float lineHeight = fontSize + 4.0f;
@@ -252,6 +251,14 @@ out:
   EndScissorMode();
 
   ArenaPop();
+}
+
+void SlideText(const char* text, Color tint) {
+  SlideDrawText(SlideShowGetTextFont(), text, tint);
+}
+
+void SlideCode(const char* text, Color tint) {
+  SlideDrawText(SlideShowGetMonospacedFont(), text, tint);
 }
 
 void SlideImage(Texture2D texture) {

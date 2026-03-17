@@ -33,6 +33,7 @@ int  SlideEndSplit(void);
 void SlideRebaseOnSplit(void);
 
 void SlideText(const char* text, Color tint);
+void SlideCode(const char* text, Color tint);
 void SlideImage(Texture2D texture);
 
 #define SlideSplit(direction) \
