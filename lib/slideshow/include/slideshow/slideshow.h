@@ -4,16 +4,13 @@
 #include <raylib.h>
 #include <stddef.h>
 
-struct _SlideDef {
-  void* data;
-  void* (*init)(void);
-  int   (*draw)(void*, size_t);
-  void  (*free)(void*);
-} ;
+typedef int (*SlideFunc)(size_t);
 
 struct _SlideShow {
+  int    (*init)(void);
+  void   (*cleanup)(void);
   size_t numSlides;
-  struct _SlideDef slides[];
+  SlideFunc slides[];
 };
 
 struct _SlideShowFonts {
@@ -50,26 +47,10 @@ Color SlideShowGetPrimaryColor(void);
 Color SlideShowGetSecondaryColor(void);
 Color SlideShowGetBackgroundColor(void);
 
-#define SLIDE_EX(_name)    \
-  { .init  = _name##Init,  \
-    .draw  = _name##Draw,  \
-    .free  = _name##Free }
-#define SLIDE(_name) \
-  { .init = NULL, .draw = _name##Draw, .free = NULL }
-
-#define SLIDE_INIT(_name) \
-  void* _name##Init(void)
-
-#define SLIDE_DRAW(_name) \
-  int _name##Draw(void* slideData, size_t slideNumber)
-
-#define SLIDE_FREE(_name) \
-  void _name##Free(void* slideData)
-
-#define SLIDESHOW(...)                      \
+#define SLIDESHOW(_init, _cleanup, ...)     \
   struct _SlideShow SlideShow = {           \
-    .numSlides = sizeof((struct _SlideDef[]) { __VA_ARGS__ }) \
-                   / sizeof(struct _SlideDef), \
+    .init = _init, .cleanup = _cleanup,     \
+    .numSlides = sizeof((SlideFunc[]) { __VA_ARGS__ }) / sizeof(SlideFunc), \
     .slides = { __VA_ARGS__ }               \
   }
 

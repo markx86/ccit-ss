@@ -69,26 +69,6 @@ static int IsKeyPressedOrRepeated(int key) {
   return IsKeyPressed(key) || IsKeyPressedRepeat(key);
 }
 
-static void InitSlides(void) {
-  struct _SlideDef* slide;
-  for (size_t i = 0; i < SlideShow.numSlides; ++i) {
-    slide = &SlideShow.slides[i];
-    if (slide->init != NULL)
-      slide->data = slide->init();
-    else
-      slide->data = NULL;
-  }
-}
-
-static void FreeSlides(void) {
-  struct _SlideDef* slide;
-  for (size_t i = 0; i < SlideShow.numSlides; ++i) {
-    slide = &SlideShow.slides[i];
-    if (slide->free != NULL)
-      slide->free(slide->data);
-  }
-}
-
 static void EndSlide(void) {
   ClearBackground(BLACK);
   DrawTextSDF(Fonts.text, "End of the presentation.", (Vector2) { 32, 32 }, 32, 1, RAYWHITE);
@@ -101,8 +81,7 @@ static int DrawSlide(size_t slideIndex) {
   }
 
   ClearBackground(CurrentColors.background);
-  struct _SlideDef* slide = &SlideShow.slides[slideIndex];
-  return slide->draw(slide->data, slideIndex + 1);
+  return SlideShow.slides[slideIndex](slideIndex + 1);
 }
 
 static int SlideShowInput(size_t* currentSlide) {
@@ -137,7 +116,11 @@ int main(void) {
   SlideShowResetColors();
 
   ArenaInit(0x100000);
-  InitSlides();
+
+  if (SlideShow.init != NULL && !SlideShow.init()) {
+    TraceLog(LOG_ERROR, "SLIDESHOW: Could not initialize slideshow!");
+    goto fail;
+  }
 
   currentSlide = 0;
   while (!WindowShouldClose()) {
@@ -154,7 +137,8 @@ int main(void) {
     EndDrawing();
   }
 
-  FreeSlides();
+  if (SlideShow.cleanup != NULL) SlideShow.cleanup();
+fail:
   ImageClearCache();
   UnloadSDFShader();
   UnloadPakFile();
