@@ -32,11 +32,17 @@ int  SlideBeginSplit(int splitDirection);
 int  SlideEndSplit(void);
 void SlideRebaseOnSplit(void);
 
-void SlideText(const char* text, Color tint);
-void SlideCode(const char* text, Color tint);
+void SlideText(const char* text);
+void SlideCode(const char* text);
 void SlideImage(Texture2D texture);
 
 #define SlideSplit(direction) \
   for (int _ = SlideBeginSplit(direction); _; _ = SlideEndSplit())
+
+#define COLOR_ESCAPE '\33'
+
+#define TXTRGB(r, g, b) "\33" #r "," #g "," #b ";"
+#define TXTCOLOR(i)     "\33" #i ";"
+#define TXTRESET()      TXTCOLOR(0)
 
 #endif

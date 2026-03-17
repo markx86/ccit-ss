@@ -1,10 +1,13 @@
+#include <assert.h>
 #include <slideshow/slide.h>
 #include <slideshow/slideshow.h>
 
 #include <base/sdf-font.h>
 #include <base/arena.h>
 
+#include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 struct {
   SlideSplit activeSplit;
@@ -170,7 +173,76 @@ int SlideBeginWithTitle(float padding, const char* title) {
   return 1;
 }
 
-static void SlideDrawText(Font font, const char* txt, Color tint) {
+static char* ParseColor(char* text, Color* color) {
+  if (text[0] != COLOR_ESCAPE)
+    goto out;
+
+  char* end = strpbrk(text + 1, ";");
+  if (end == NULL)
+    goto out;
+
+  int commas = 0;
+  for (char* p = text + 1; p < end; ++p) {
+    if (isdigit(*p))
+      continue;
+    else if (*p == ',')
+      ++commas;
+    else
+      goto out;
+  }
+
+  char* endp;
+  if (commas == 0) {
+    /* Indexed color */
+    int index = strtoul(text + 1, &endp, 10);
+    if (index >= 3)
+      goto out;
+
+    const Color colors[] = {
+      SlideShowGetPrimaryColor(),
+      SlideShowGetSecondaryColor(),
+      SlideShowGetAccentColor(),
+    };
+    *color = colors[index];
+  } else if (commas == 2) {
+    /* RGB color */
+    char* comma1 = strpbrk(text   + 1, ",");
+    char* comma2 = strpbrk(comma1 + 1, ",");
+
+    unsigned char r = strtoul(text + 1, &endp, 10);
+    if (endp != comma1)
+      goto out;
+
+    unsigned char g = strtoul(comma1 + 1, &endp, 10);
+    if (endp != comma2)
+      goto out;
+
+    unsigned char b = strtoul(comma2 + 1, &endp, 10);
+    if (endp != end)
+      goto out;
+
+    color->r = r;
+    color->g = g;
+    color->b = b;
+  } else
+    goto out;
+
+  text = end + 1;
+out:
+  return text;
+}
+
+static char* NextStopChar(char* cursor, char* end) {
+  char* stopChar = strpbrk(cursor, " \33");
+  return stopChar == NULL ? end : stopChar;
+}
+
+static float TextWidth(Font font, const char* text, int fontSize) {
+  return MeasureTextEx(font, text, fontSize, 1.0f).x;
+}
+
+static void SlideDrawText(Font font, const char* txt) {
+  Color tint = SlideShowGetPrimaryColor();
   int fontSize = SlideShowGetTextFontSize();
   Rectangle rect = SlideSplitRect();
   const float lineHeight = fontSize + 4.0f;
@@ -187,63 +259,96 @@ static void SlideDrawText(Font font, const char* txt, Color tint) {
   while ((p = strpbrk(p + 1, "\n")) != NULL)
     *p = '\0';
 
-  float lineY = rect.y;
+  Vector2 pos = { rect.x, rect.y };
   /* For every line in the text */
   char* lineEnd;
   for (char* line = text; line < textEnd; line = lineEnd + 1) {
     /* If the line is outside the rectangle, break out */
-    if (lineY >= rect.y + rect.height)
+    if (pos.y >= rect.y + rect.height)
       break;
 
-    float lineWidth = 0.0f;
     lineEnd = line + strlen(line);
     /* If the line is empty, increment the next line's Y coordinate and go to the next one */
     if (lineEnd == line) {
-      lineY += lineHeight;
+      pos.y += lineHeight;
       continue;
     }
 
     /* Draw text line with wrapping */
-    char *chunk = line, *chunkEnd = chunk;
-    char blankChar = *line;
-    while (chunkEnd != lineEnd) {
-      chunkEnd = strpbrk(chunk, " ");
-      if (chunkEnd == NULL)
-        chunkEnd = lineEnd;
+    for (;;) {
+      char* lineBreak = line - 1;
+      float lineWidth = 0.0f;
+      bool overflow = false;
+      while (lineBreak < lineEnd) {
+        char* newLineBreak = NextStopChar(lineBreak + 1, lineEnd);
+        char stopChar = newLineBreak[0];
 
-      blankChar = *chunkEnd;
-      *chunkEnd = '\0';
-      float chunkWidth = *chunk == '\0' ? spaceWidth : MeasureTextEx(font, chunk, fontSize, 1.0f).x;
-      float newLineWidth = chunkWidth + lineWidth;
-      *chunkEnd = blankChar;
+        newLineBreak[0] = '\0';
+        float newLineWidth = TextWidth(font, line, fontSize);
+        TraceLog(LOG_INFO, "New line width %.2f (max width: %.2f, line = '%s', stopChar = %02x)", newLineWidth + (pos.x - rect.x), rect.width, line, stopChar);
+        newLineBreak[0] = stopChar;
 
-      if (newLineWidth >= rect.width) {
-        /* The current line overflows the width of the container, draw the current buffer and continue */
+        if (pos.x + newLineWidth >= rect.x + rect.width) {
+          overflow = true;
+          break;
+        }
 
-        /* NOTE: Sometimes a line can overflow leaving behind the last chunk. This if statement prevents that. */
-        if (blankChar == '\0' && chunkEnd == lineEnd)
-          --chunkEnd;
-      draw:
-        chunk[-1] = '\0'; /* `chunk` always points to the first character of this chunk,
-                           * that means that chunk[-1] is the last whitespace
-                           */
-        DrawTextSDF(font, line, (Vector2) { rect.x, lineY }, fontSize, 1.0f, tint);
-        line = chunk;
-        lineY += lineHeight;
-        lineWidth = chunkWidth + spaceWidth;
-        /* If the next line won't fit into the rectangle, we can break out */
-        if (lineY >= rect.y + rect.height)
-          goto out;
-      } else if (blankChar == '\0') {
-        /* End of the line, draw the remaining characters */
-        chunk = chunkEnd + 1;
-        goto draw;
-      } else {
-        /* The line still fits into the width of the container, keep counting the line width */
-        lineWidth = newLineWidth + spaceWidth;
+        lineBreak = newLineBreak;
+        lineWidth = newLineWidth;
+
+        if (stopChar == '\0' || stopChar == COLOR_ESCAPE)
+          break;
       }
 
-      chunk = chunkEnd + 1;
+      if (lineWidth <= 0.0f) {
+        assert(overflow);
+        goto overflow;
+      }
+
+      char stopChar = lineBreak[0];
+      lineBreak[0] = '\0';
+      TraceLog(LOG_INFO, "Drawing line '%s'", line);
+      DrawTextSDF(font, line, pos, fontSize, 1.0f, tint);
+      lineBreak[0] = stopChar;
+
+      if (overflow) {
+      overflow:
+        pos.x = rect.x;
+        pos.y += lineHeight;
+        /* If the next line won't fit into the rectangle, we can exit out early */
+        if /**/ (pos.y >= rect.y + rect.height)
+          goto out;
+        /* We overflowed without parsing text, retry */
+        else if (lineWidth <= 0.0f)
+          goto skip_spaces;
+      } else {
+        pos.x += lineWidth;
+        /* If the stop char was a space, we have to account for it's width */
+        if (stopChar == ' ') {
+          pos.x += spaceWidth;
+          /* Check if we've overflowed thanks to the space */
+          if (pos.x >= rect.x + rect.width) {
+            overflow = true;
+            goto overflow;
+          }
+        }
+      }
+
+      /* End of line */
+      if (stopChar == '\0')
+        break;
+
+      /* Color sequence is next */
+      if /**/ (stopChar == COLOR_ESCAPE)
+        line = ParseColor(lineBreak, &tint);
+      else /* (stopChar == ' ') */ {
+        assert(overflow);
+        line = lineBreak + 1;
+        /* If we broke due to a space, skip extra spaces that would otherwise end up at the start of the new line */
+      skip_spaces:
+        while (isblank(*line))
+          ++line;
+      }
     }
   }
 out:
@@ -253,12 +358,12 @@ out:
   ArenaPop();
 }
 
-void SlideText(const char* text, Color tint) {
-  SlideDrawText(SlideShowGetTextFont(), text, tint);
+void SlideText(const char* text) {
+  SlideDrawText(SlideShowGetTextFont(), text);
 }
 
-void SlideCode(const char* text, Color tint) {
-  SlideDrawText(SlideShowGetMonospacedFont(), text, tint);
+void SlideCode(const char* text) {
+  SlideDrawText(SlideShowGetMonospacedFont(), text);
 }
 
 void SlideImage(Texture2D texture) {
