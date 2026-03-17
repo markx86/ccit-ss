@@ -5,26 +5,110 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void InitActiveSplit(Slide* s, Rectangle view, SlideSplitDirection direction) {
-  s->activeSplit.view = view;
-  s->activeSplit.freeRect = view;
-  s->activeSplit.direction = direction;
-  switch (s->activeSplit.direction) {
+struct {
+  SlideSplit activeSplit;
+  float padding;
+  int numActiveSplits;
+  SlideSplit activeSplits[SLIDE_MAX_SPLITS];
+} Slide;
+
+static void InitActiveSplit(Rectangle view, SlideSplitDirection direction) {
+  Slide.activeSplit.view = view;
+  Slide.activeSplit.freeRect = view;
+  Slide.activeSplit.direction = direction;
+  switch (Slide.activeSplit.direction) {
     case SLIDE_SPLIT_VERTICAL:
-      s->activeSplit.lastRect.width = view.width;
-      s->activeSplit.lastRect.height = 0.0f;
+      Slide.activeSplit.lastRect.width = view.width;
+      Slide.activeSplit.lastRect.height = 0.0f;
       break;
     case SLIDE_SPLIT_HORIZONTAL:
-      s->activeSplit.lastRect.width = 0.0f;
-      s->activeSplit.lastRect.height = view.height;
+      Slide.activeSplit.lastRect.width = 0.0f;
+      Slide.activeSplit.lastRect.height = view.height;
       break;
     default:
-      s->activeSplit.lastRect = view;
+      Slide.activeSplit.lastRect = view;
       break;
   }
 }
 
-int SlideBegin(Slide* s, float padding) {
+static int PushSplit(void) {
+  if (Slide.numActiveSplits >= SLIDE_MAX_SPLITS)
+    return 0;
+  Slide.activeSplits[Slide.numActiveSplits++] = Slide.activeSplit;
+  return 1;
+}
+
+static void PopSplit(void) {
+  if (Slide.numActiveSplits > 0)
+    Slide.activeSplit = Slide.activeSplits[--Slide.numActiveSplits];
+}
+
+static int SplitCurrentRect(float w, float h) {
+  Rectangle newRect;
+  Rectangle split;
+  switch (Slide.activeSplit.direction) {
+    case SLIDE_SPLIT_NONE:
+      /* Cannot split this slide */
+      return 0;
+    case SLIDE_SPLIT_VERTICAL:
+      split = (Rectangle) {
+        Slide.activeSplit.freeRect.x,
+        Slide.activeSplit.freeRect.y,
+        Slide.activeSplit.freeRect.width,
+        h
+      };
+      newRect = (Rectangle) {
+        split.x,
+        split.y + h + Slide.padding,
+        Slide.activeSplit.freeRect.width,
+        Slide.activeSplit.freeRect.height - h - Slide.padding,
+      };
+      break;
+    case SLIDE_SPLIT_HORIZONTAL:
+      split = (Rectangle) {
+        Slide.activeSplit.freeRect.x,
+        Slide.activeSplit.freeRect.y,
+        w,
+        Slide.activeSplit.freeRect.height
+      };
+      newRect = (Rectangle) {
+        split.x + w + Slide.padding,
+        split.y,
+        Slide.activeSplit.freeRect.width - w - Slide.padding,
+        Slide.activeSplit.freeRect.height,
+      };
+      break;
+  }
+
+  Slide.activeSplit.lastRect = split;
+  Slide.activeSplit.freeRect = newRect;
+
+  return    split.x >= Slide.activeSplit.view.x && split.x + split.width  <= Slide.activeSplit.view.x + Slide.activeSplit.view.width
+         && split.y >= Slide.activeSplit.view.y && split.y + split.height <= Slide.activeSplit.view.y + Slide.activeSplit.view.height;
+}
+
+int SlideSplitByPercent(float perc) {
+  return SplitCurrentRect(Slide.activeSplit.freeRect.width  * perc - Slide.padding * 0.5f,
+                          Slide.activeSplit.freeRect.height * perc - Slide.padding * 0.5f);
+}
+
+int SlideSplitBySize(int pixels) {
+  return SplitCurrentRect(pixels, pixels);
+}
+
+int SlideSplitHalf(void) {
+  return SlideSplitByPercent(0.5f);
+}
+
+int SlideSplitRemaining(void) {
+  return SplitCurrentRect(Slide.activeSplit.freeRect.width, Slide.activeSplit.freeRect.height);
+}
+
+Rectangle SlideSplitRect(void) {
+  return Slide.activeSplit.lastRect;
+}
+
+int SlideBegin(float padding) {
   Rectangle view = {
     padding,
     padding,
@@ -35,119 +119,45 @@ int SlideBegin(Slide* s, float padding) {
   if (padding < 0.0f)
     return 0;
 
-  s->padding = padding;
-  s->numActiveSplits = 0;
-  InitActiveSplit(s, view, SLIDE_SPLIT_NONE);
+  Slide.padding = padding;
+  Slide.numActiveSplits = 0;
+  InitActiveSplit(view, SLIDE_SPLIT_NONE);
 
   return 1;
 }
 
-static int PushSplit(Slide* s) {
-  if (s->numActiveSplits >= SLIDE_MAX_SPLITS)
-    return 0;
-  s->activeSplits[s->numActiveSplits++] = s->activeSplit;
-  return 1;
-}
-
-static void PopSplit(Slide* s) {
-  if (s->numActiveSplits > 0)
-    s->activeSplit = s->activeSplits[--s->numActiveSplits];
-}
-
-static int SplitCurrentRect(Slide* s, float w, float h) {
-  Rectangle newRect;
-  Rectangle split;
-  switch (s->activeSplit.direction) {
-    case SLIDE_SPLIT_NONE:
-      /* Cannot split this slide */
-      return 0;
-    case SLIDE_SPLIT_VERTICAL:
-      split = (Rectangle) {
-        s->activeSplit.freeRect.x,
-        s->activeSplit.freeRect.y,
-        s->activeSplit.freeRect.width,
-        h
-      };
-      newRect = (Rectangle) {
-        split.x,
-        split.y + h + s->padding,
-        s->activeSplit.freeRect.width,
-        s->activeSplit.freeRect.height - h - s->padding,
-      };
-      break;
-    case SLIDE_SPLIT_HORIZONTAL:
-      split = (Rectangle) {
-        s->activeSplit.freeRect.x,
-        s->activeSplit.freeRect.y,
-        w,
-        s->activeSplit.freeRect.height
-      };
-      newRect = (Rectangle) {
-        split.x + w + s->padding,
-        split.y,
-        s->activeSplit.freeRect.width - w - s->padding,
-        s->activeSplit.freeRect.height,
-      };
-      break;
-  }
-
-  s->activeSplit.lastRect = split;
-  s->activeSplit.freeRect = newRect;
-
-  return    split.x >= s->activeSplit.view.x && split.x + split.width  <= s->activeSplit.view.x + s->activeSplit.view.width
-         && split.y >= s->activeSplit.view.y && split.y + split.height <= s->activeSplit.view.y + s->activeSplit.view.height;
-}
-
-int SlideSplitByPercent(Slide* s, float perc) {
-  return SplitCurrentRect(s,
-                          s->activeSplit.freeRect.width * perc - s->padding * 0.5f,
-                          s->activeSplit.freeRect.height * perc - s->padding * 0.5f);
-}
-
-int SlideSplitBySize(Slide* s, int pixels) {
-  return SplitCurrentRect(s, pixels, pixels);
-}
-
-int SlideSplitHalf(Slide* s) {
-  return SlideSplitByPercent(s, 0.5f);
-}
-
-int SlideSplitRemaining(Slide* s) {
-  return SplitCurrentRect(s, s->activeSplit.freeRect.width, s->activeSplit.freeRect.height);
-}
-
-int SlideBeginSplit(Slide* s, int splitDirection) {
-  Rectangle view = s->activeSplit.lastRect;
-  if (!PushSplit(s))
+int SlideBeginSplit(int splitDirection) {
+  Rectangle view = Slide.activeSplit.lastRect;
+  if (!PushSplit())
     return 0;
 
-  InitActiveSplit(s, view, splitDirection);
+  InitActiveSplit(view, splitDirection);
   return 1;
 }
 
-int SlideEndSplit(Slide* s) {
-  PopSplit(s);
+int SlideEndSplit(void) {
+  PopSplit();
   return 0;
 }
 
-void SlideRebaseOnSplit(Slide* s) {
-  s->numActiveSplits = 0;
-  InitActiveSplit(s, s->activeSplit.freeRect, SLIDE_SPLIT_NONE);
+void SlideRebaseOnSplit(void) {
+  Slide.numActiveSplits = 0;
+  InitActiveSplit(Slide.activeSplit.freeRect, SLIDE_SPLIT_NONE);
 }
 
-int SlideBeginWithTitle(Slide* s, float padding, const char* title) {
-  if (!SlideBegin(s, padding))
+int SlideBeginWithTitle(float padding, const char* title) {
+  if (!SlideBegin(padding))
     return 0;
 
   Font font = SlideShowGetTitleFont();
   int fontSize = SlideShowGetTitleFontSize();
   Vector2 titleSize = MeasureTextEx(font, title, fontSize, 1);
 
-  if (!SlideBeginSplit(s, SLIDE_SPLIT_VERTICAL))
+  if (!SlideBeginSplit(SLIDE_SPLIT_VERTICAL))
     return 0;
 
-  if (SlideSplitBySize(s, titleSize.y * 2)) {
-    Rectangle r = SlideSplitRect(s);
+  if (SlideSplitBySize(titleSize.y * 2)) {
+    Rectangle r = SlideSplitRect();
     Vector2 pos = {
       r.x + 64.0f,
       r.y + (r.height - titleSize.y) * 0.5f
@@ -155,14 +165,14 @@ int SlideBeginWithTitle(Slide* s, float padding, const char* title) {
     DrawTextSDF(font, title, pos, fontSize, 1, SlideShowGetPrimaryColor());
   }
 
-  SlideRebaseOnSplit(s);
+  SlideRebaseOnSplit();
   return 1;
 }
 
-void SlideText(Slide* s, const char* txt, Color tint) {
+void SlideText(const char* txt, Color tint) {
   Font font = SlideShowGetTextFont();
   int fontSize = SlideShowGetTextFontSize();
-  Rectangle rect = SlideSplitRect(s);
+  Rectangle rect = SlideSplitRect();
   const float lineHeight = fontSize + 4.0f;
   const float spaceWidth = MeasureTextEx(font, " ", fontSize, 1.0f).x;
 
@@ -229,3 +239,7 @@ void SlideText(Slide* s, const char* txt, Color tint) {
   free(text);
 }
 
+void SlideImage(Texture texture) {
+  Rectangle rect = SlideSplitRect();
+  /* TODO */
+}

@@ -18,32 +18,24 @@ typedef struct {
   SlideSplitDirection direction;
 } SlideSplit;
 
-typedef struct {
-  SlideSplit activeSplit;
-  float padding;
-  int numActiveSplits;
-  SlideSplit activeSplits[SLIDE_MAX_SPLITS];
-} Slide;
+int SlideBegin(float padding);
+int SlideBeginWithTitle(float padding, const char* title);
 
-int SlideBegin(Slide* s, float padding);
-int SlideBeginWithTitle(Slide* s, float padding, const char* title);
+Rectangle SlideSplitRect(void);
 
-static inline Rectangle SlideSplitRect(Slide* s) {
-  return s->activeSplit.lastRect;
-}
+int SlideSplitByPercent(float perc);
+int SlideSplitBySize(int pixels);
+int SlideSplitHalf(void);
+int SlideSplitRemaining(void);
 
-int SlideSplitByPercent(Slide* s, float perc);
-int SlideSplitBySize(Slide* s, int pixels);
-int SlideSplitHalf(Slide* s);
-int SlideSplitRemaining(Slide* s);
+int  SlideBeginSplit(int splitDirection);
+int  SlideEndSplit(void);
+void SlideRebaseOnSplit(void);
 
-int  SlideBeginSplit(Slide* s, int splitDirection);
-int  SlideEndSplit(Slide* s);
-void SlideRebaseOnSplit(Slide* s);
+void SlideText(const char* text, Color tint);
+void SlideImage(Texture texture);
 
-void SlideText(Slide* s, const char* text, Color tint);
-
-#define SlideSplit(s, direction) \
-  for (int i = SlideBeginSplit(s, direction); i; i = SlideEndSplit(s))
+#define SlideSplit(direction) \
+  for (int i = SlideBeginSplit(direction); i; i = SlideEndSplit())
 
 #endif
