@@ -2,6 +2,8 @@
 #include <slideshow/slideshow.h>
 
 #include <base/sdf-font.h>
+#include <base/arena.h>
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -178,7 +180,9 @@ void SlideText(const char* txt, Color tint) {
 
   BeginScissorMode(rect.x, rect.y, rect.width, rect.height);
 
-  char *text = strdup(txt), *textEnd = text + strlen(text);
+  ArenaPush();
+
+  char *text = ArenaStrdup(txt), *textEnd = text + strlen(text);
 
   /* Split text into lines first */
   char* p = text - 1;
@@ -236,7 +240,7 @@ void SlideText(const char* txt, Color tint) {
 
   EndScissorMode();
 
-  free(text);
+  ArenaPop();
 }
 
 void SlideImage(Texture texture) {

@@ -4,6 +4,7 @@ project(base C)
 add_library(base STATIC
   src/pak.c
   src/sdf-font.c
+  src/arena.c
 )
 
 target_include_directories(base PUBLIC

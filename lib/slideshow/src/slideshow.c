@@ -2,6 +2,7 @@
 
 #include <base/sdf-font.h>
 #include <base/pak.h>
+#include <base/arena.h>
 
 #include <raylib.h>
 
@@ -103,7 +104,9 @@ static int DrawSlide(size_t slideIndex) {
   return slide->draw(slide->data, slideIndex + 1);
 }
 
-static void SlideShowInput(size_t* currentSlide) {
+static int SlideShowInput(size_t* currentSlide) {
+  int initialValue = *currentSlide;
+
   if /**/ (IsKeyPressedOrRepeated(KEY_LEFT)
            && *currentSlide > 0)
     --(*currentSlide);
@@ -115,6 +118,8 @@ static void SlideShowInput(size_t* currentSlide) {
     *currentSlide = 0;
   else if (IsKeyPressed(KEY_END))
     *currentSlide = SlideShow.numSlides - 1;
+
+  return initialValue != *currentSlide;
 }
 
 int main(void) {
@@ -131,12 +136,16 @@ int main(void) {
   SlideShowResetFontSizes();
   SlideShowResetColors();
 
+  ArenaInit(0x100000);
+
   currentSlide = 0;
   while (!WindowShouldClose()) {
     BeginDrawing();
 
-    if (!DrawSlide(currentSlide))
-      SlideShowInput(&currentSlide);
+    if (!DrawSlide(currentSlide) && SlideShowInput(&currentSlide)) {
+      /* If we changed slides, deallocate all the memory int the arena */
+      ArenaReset();
+    }
 
     if (IsKeyPressed(KEY_F11))
       ToggleFullscreen();
