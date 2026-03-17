@@ -41,14 +41,14 @@ void* ArenaAlloc(unsigned long size) {
 
   if (Arena.top + chunkSize > Arena.memEnd) {
     TraceLog(LOG_ERROR,
-             "[ARENA] OOM! Trying to allocated %zu bytes (arena top: %p, arena base: %p, arena mem: %p, arena size: %zu)",
+             "ARENA: OOM! Trying to allocated %zu bytes (arena top: %p, arena base: %p, arena mem: %p, arena size: %zu)",
              chunkSize, Arena.top, Arena.base, Arena.mem, Arena.memEnd - Arena.mem);
     return NULL;
   }
 
   void* chunk = Arena.top;
   Arena.top += chunkSize;
-  TraceLog(LOG_TRACE, "[ARENA] Allocating %zu bytes (chunk = %p, chunk end = %p)",
+  TraceLog(LOG_TRACE, "ARENA: Allocating %zu bytes (chunk = %p, chunk end = %p)",
            chunkSize, chunk, Arena.top);
   return chunk;
 }

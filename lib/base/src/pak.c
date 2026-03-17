@@ -53,24 +53,24 @@ static unsigned char* LoadFileFromPak(const char* path, int* size) {
 
   PakHeaderEntry* e = FindHeaderEntry(path, hash);
   if (e == NULL) {
-    TraceLog(LOG_WARNING, "[PAKIO] Could not find file '%s' (hash: %016X)", path, hash);
+    TraceLog(LOG_WARNING, "PAKIO: Could not find file '%s' (hash: %016X)", path, hash);
     return NULL;
   }
 
   if (fseek(pakFile, e->offset, SEEK_SET) < 0) {
-    TraceLog(LOG_ERROR, "[PAKIO] Could not seek to %08x (file: '%s', hash: %016X)", e->offset, path, hash);
+    TraceLog(LOG_ERROR, "PAKIO: Could not seek to %08x (file: '%s', hash: %016X)", e->offset, path, hash);
     return NULL;
   }
 
   unsigned char* buffer = MemAlloc(e->size);
   if (buffer == NULL) {
-    TraceLog(LOG_ERROR, "[PAKIO] Could not allocate buffer for file '%s' (hash: %016X)", path, hash);
+    TraceLog(LOG_ERROR, "PAKIO: Could not allocate buffer for file '%s' (hash: %016X)", path, hash);
     return NULL;
   }
 
-  TraceLog(LOG_INFO, "[PAKIO] Reading %u bytes @ offset %08X (file: '%s', hash: %016X)", e->size, e->offset, path, hash);
+  TraceLog(LOG_INFO, "PAKIO: Reading %u bytes @ offset %08X (file: '%s', hash: %016X)", e->size, e->offset, path, hash);
   if (fread(buffer, e->size, 1, pakFile) != 1) {
-    TraceLog(LOG_ERROR, "[PAKIO] Could not read file '%s' (hash: %016X)", path, hash);
+    TraceLog(LOG_ERROR, "PAKIO: Could not read file '%s' (hash: %016X)", path, hash);
     MemFree(buffer);
     return NULL;
   }
