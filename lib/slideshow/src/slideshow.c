@@ -105,7 +105,7 @@ static int DrawSlide(size_t slideIndex) {
 }
 
 static int SlideShowInput(size_t* currentSlide) {
-  int initialValue = *currentSlide;
+  size_t initialValue = *currentSlide;
 
   if /**/ (IsKeyPressedOrRepeated(KEY_LEFT)
            && *currentSlide > 0)
@@ -131,12 +131,12 @@ int main(void) {
   LoadPakFile();
   LoadSDFShader();
   LoadFonts();
-  InitSlides();
 
   SlideShowResetFontSizes();
   SlideShowResetColors();
 
   ArenaInit(0x100000);
+  InitSlides();
 
   currentSlide = 0;
   while (!WindowShouldClose()) {

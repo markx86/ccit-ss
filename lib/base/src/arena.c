@@ -1,13 +1,15 @@
 #include <base/arena.h>
 
+#include <raylib.h>
+
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/mman.h>
 
 struct {
-  uint8_t* chunk;
-  uint8_t* chunkEnd;
+  uint8_t* mem;
+  uint8_t* memEnd;
   uint8_t* base;
   uint8_t* top;
 } Arena;
@@ -25,8 +27,8 @@ int ArenaInit(unsigned long size) {
   if (chunk == MAP_FAILED)
     return 0;
 
-  Arena.chunk    = chunk;
-  Arena.chunkEnd = chunk + size;
+  Arena.mem    = chunk;
+  Arena.memEnd = chunk + size;
   Arena.base     = chunk;
   Arena.top      = chunk;
 
@@ -34,14 +36,20 @@ int ArenaInit(unsigned long size) {
 }
 
 void* ArenaAlloc(unsigned long size) {
-  /* Always align size to 16 bytes */
-  size = (size + 0xFUL) & ~0xFUL;
+  /* Always align size to 8 bytes */
+  unsigned long chunkSize = (size + 0x7UL) & ~0x7UL;
 
-  if (Arena.top + size > Arena.chunkEnd)
+  if (Arena.top + chunkSize > Arena.memEnd) {
+    TraceLog(LOG_ERROR,
+             "[ARENA] OOM! Trying to allocated %zu bytes (arena top: %p, arena base: %p, arena mem: %p, arena size: %zu)",
+             chunkSize, Arena.top, Arena.base, Arena.mem, Arena.memEnd - Arena.mem);
     return NULL;
+  }
 
   void* chunk = Arena.top;
-  Arena.top += size;
+  Arena.top += chunkSize;
+  TraceLog(LOG_TRACE, "[ARENA] Allocating %zu bytes (chunk = %p, chunk end = %p)",
+           chunkSize, chunk, Arena.top);
   return chunk;
 }
 
@@ -63,7 +71,7 @@ int ArenaPush(void) {
 }
 
 int ArenaPop(void) {
-  if (Arena.base <= Arena.chunk)
+  if (Arena.base <= Arena.mem)
     return 0;
 
   void** prevBase = (void**)(Arena.base - sizeof(*prevBase));
@@ -77,6 +85,6 @@ void ArenaFree(void) {
 }
 
 void ArenaReset(void) {
-  Arena.base = Arena.chunk;
+  Arena.base = Arena.mem;
   ArenaFree();
 }

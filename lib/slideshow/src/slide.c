@@ -4,7 +4,6 @@
 #include <base/sdf-font.h>
 #include <base/arena.h>
 
-#include <stdlib.h>
 #include <string.h>
 
 struct {

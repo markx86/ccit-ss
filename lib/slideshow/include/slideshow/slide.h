@@ -33,9 +33,9 @@ int  SlideEndSplit(void);
 void SlideRebaseOnSplit(void);
 
 void SlideText(const char* text, Color tint);
-void SlideImage(Texture texture);
+void SlideImage(Texture2D texture);
 
 #define SlideSplit(direction) \
-  for (int i = SlideBeginSplit(direction); i; i = SlideEndSplit())
+  for (int _ = SlideBeginSplit(direction); _; _ = SlideEndSplit())
 
 #endif
