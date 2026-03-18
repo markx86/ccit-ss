@@ -20,6 +20,7 @@ typedef struct {
 
 int SlideBegin(float padding);
 int SlideBeginWithTitle(float padding, const char* title);
+int SlideBeginWithTitleEx(float padding, const char* title, Color titleColor);
 
 Rectangle SlideSplitRect(void);
 
@@ -33,7 +34,7 @@ int  SlideEndSplit(void);
 void SlideRebaseOnSplit(void);
 
 void SlideText(const char* text);
-void SlideCode(const char* text);
+void SlideTextEx(const char* txt, int fontSize);
 void SlideImage(Texture2D texture);
 
 #define SlideSplit(direction) \

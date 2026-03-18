@@ -1,3 +1,4 @@
+#include "slideshow/slide.h"
 #include <slideshow/slideshow.h>
 
 #include <base/sdf-font.h>
@@ -84,7 +85,7 @@ static int IsKeyPressedOrRepeated(int key) {
 
 static void EndSlide(void) {
   ClearBackground(BLACK);
-  DrawTextSDF(SlideShowGetFont(FONT_STYLE_BOLD), "End of the presentation.", (Vector2) { 32, 32 }, 32, 1, RAYWHITE);
+  SlideBeginWithTitleEx(64.0f, "End of the presentation.", RAYWHITE);
 }
 
 static int DrawSlide(size_t slideIndex) {

@@ -150,6 +150,10 @@ void SlideRebaseOnSplit(void) {
 }
 
 int SlideBeginWithTitle(float padding, const char* title) {
+  return SlideBeginWithTitleEx(padding, title, SlideShowGetPrimaryColor());
+}
+
+int SlideBeginWithTitleEx(float padding, const char* title, Color titleColor) {
   if (!SlideBegin(padding))
     return 0;
 
@@ -160,13 +164,10 @@ int SlideBeginWithTitle(float padding, const char* title) {
   if (!SlideBeginSplit(SLIDE_SPLIT_VERTICAL))
     return 0;
 
-  if (SlideSplitBySize(titleSize.y * 2)) {
+  if (SlideSplitBySize(titleSize.y)) {
     Rectangle r = SlideSplitRect();
-    Vector2 pos = {
-      r.x + 64.0f,
-      r.y + (r.height - titleSize.y) * 0.5f
-    };
-    DrawTextSDF(font, title, pos, fontSize, 1, SlideShowGetPrimaryColor());
+    Vector2 pos = { r.x, r.y };
+    DrawTextSDF(font, title, pos, fontSize, 1, titleColor);
   }
 
   SlideRebaseOnSplit();
@@ -427,8 +428,11 @@ static float GetTokenChainWidth(TextToken* tok, TextToken** lastToken) {
 }
 
 void SlideText(const char* txt) {
+  return SlideTextEx(txt, SlideShowGetTextFontSize());
+}
+
+void SlideTextEx(const char* txt, int fontSize) {
   TextStyle style;
-  int fontSize = SlideShowGetTextFontSize();
   Rectangle rect = SlideSplitRect();
   const float lineHeight = fontSize + 4.0f;
 
