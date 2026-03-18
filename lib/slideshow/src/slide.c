@@ -153,7 +153,7 @@ int SlideBeginWithTitle(float padding, const char* title) {
   if (!SlideBegin(padding))
     return 0;
 
-  Font font = SlideShowGetTitleFont();
+  Font font = SlideShowGetFont(FONT_STYLE_BOLD);
   int fontSize = SlideShowGetTitleFontSize();
   Vector2 titleSize = MeasureTextEx(font, title, fontSize, 1);
 
@@ -173,7 +173,71 @@ int SlideBeginWithTitle(float padding, const char* title) {
   return 1;
 }
 
-static char* ParseColor(char* text, Color* color) {
+static char* SplitLines(char* text) {
+  char* textEnd = text + strlen(text);
+  char* p = text - 1;
+  while ((p = strpbrk(p + 1, "\n")) != NULL && p < textEnd)
+    *p = '\0';
+  return textEnd;
+}
+
+typedef struct {
+  int bold       : 1;
+  int italic     : 1;
+  int underline  : 1;
+  int code       : 1;
+  int _          : 4;
+  int colorRed   : 8;
+  int colorGreen : 8;
+  int colorBlue  : 8;
+} TextStyle;
+
+typedef struct TextToken {
+  struct TextToken* next;
+  TextStyle style;
+  float width;
+  float spaceWidth;
+  bool joinWithNext;
+  size_t length;
+  char  string[];
+} TextToken;
+
+#define COLOR_ESCAPE '\33'
+
+static Font GetFontByStyle(TextStyle style) {
+  int fontStyle = FONT_STYLE_REGULAR;
+  if (style.bold)
+    fontStyle |= FONT_STYLE_BOLD;
+  if (style.italic)
+    fontStyle |= FONT_STYLE_ITALIC;
+  if (style.code)
+    fontStyle |= FONT_STYLE_MONOSPACED;
+  return SlideShowGetFont(fontStyle);
+}
+
+static Color GetColorByStyle(TextStyle style) {
+  return (Color) { style.colorRed, style.colorGreen, style.colorBlue, 255 };
+}
+
+static float TokenWidth(TextToken* tok, int fontSize) {
+  Font font = GetFontByStyle(tok->style);
+  return MeasureTextEx(font, tok->string, fontSize, 1.0f).x;
+}
+
+static void TokenDraw(TextToken* tok, Vector2* pos, int fontSize) {
+  Color color = GetColorByStyle(tok->style);
+  DrawTextSDF(GetFontByStyle(tok->style), tok->string, *pos, fontSize, 1.0f, color);
+  if (tok->style.underline) {
+    int y = pos->y + fontSize + 1;
+    float width = tok->width;
+    if (!tok->joinWithNext)
+      width -= tok->spaceWidth;
+    DrawLine(pos->x, y, pos->x + width, y, color);
+  }
+  pos->x += tok->width;
+}
+
+static char* ParseColor(char* text, TextStyle* style) {
   if (text[0] != COLOR_ESCAPE)
     goto out;
 
@@ -192,178 +256,260 @@ static char* ParseColor(char* text, Color* color) {
   }
 
   char* endp;
+  Color c;
   if (commas == 0) {
     /* Indexed color */
     int index = strtoul(text + 1, &endp, 10);
     if (index >= 3)
       goto out;
 
-    const Color colors[] = {
+    const Color slideShowColors[] = {
       SlideShowGetPrimaryColor(),
       SlideShowGetSecondaryColor(),
-      SlideShowGetAccentColor(),
+      SlideShowGetAccentColor()
     };
-    *color = colors[index];
+    c = slideShowColors[index];
   } else if (commas == 2) {
     /* RGB color */
     char* comma1 = strpbrk(text   + 1, ",");
     char* comma2 = strpbrk(comma1 + 1, ",");
 
-    unsigned char r = strtoul(text + 1, &endp, 10);
+    c.r = strtoul(text + 1, &endp, 10);
     if (endp != comma1)
       goto out;
 
-    unsigned char g = strtoul(comma1 + 1, &endp, 10);
+    c.g = strtoul(comma1 + 1, &endp, 10);
     if (endp != comma2)
       goto out;
 
-    unsigned char b = strtoul(comma2 + 1, &endp, 10);
+    c.b = strtoul(comma2 + 1, &endp, 10);
     if (endp != end)
       goto out;
-
-    color->r = r;
-    color->g = g;
-    color->b = b;
   } else
     goto out;
 
-  text = end + 1;
+  style->colorRed   = c.r;
+  style->colorGreen = c.g;
+  style->colorBlue  = c.b;
+  return end + 1;
 out:
-  return text;
+  return text + 1;
 }
 
-static char* NextStopChar(char* cursor, char* end) {
-  char* stopChar = strpbrk(cursor, " \33");
-  return stopChar == NULL ? end : stopChar;
+static char* MaybeUpdateStyle(char* end, TextStyle* style) {
+  switch (*end) {
+    case '*':
+      style->bold = !style->bold;
+      break;
+    case '_':
+      style->italic = !style->italic;
+      break;
+    case '~':
+      style->underline = !style->underline;
+      break;
+    case '`':
+      style->code = !style->code;
+      break;
+    case COLOR_ESCAPE:
+      return ParseColor(end, style);
+    default:
+      break;
+  }
+  return end + 1;
 }
 
-static float TextWidth(Font font, const char* text, int fontSize) {
-  return MeasureTextEx(font, text, fontSize, 1.0f).x;
+static void StripEscapeCharacters(char* str, size_t len) {
+  char *p = str, *pEnd = str + len + 1;
+  while (p < pEnd) {
+    if (*p == '\\') {
+      memmove(p, p + 1, pEnd - (p + 1));
+      --pEnd;
+      assert(*pEnd == '\0');
+    }
+    ++p;
+  }
 }
 
-static void SlideDrawText(Font font, const char* txt) {
-  Color tint = SlideShowGetPrimaryColor();
+static char* NextStopChar(char* s, TextStyle* style) {
+  /* NOTE: When we are in a block of code, we don't want to treat ~, *, _ as special characters. */
+  if (style->code)
+    return strpbrk(s, " `\33");
+  else
+    return strpbrk(s, " ~*_`\33");
+}
+
+static TextToken* Tokenize(char* line, char* lineEnd, TextStyle* style, int fontSize) {
+  char* tokBegin = line;
+  TextToken* firstToken = NULL;
+  TextToken* lastToken = NULL;
+  while (tokBegin < lineEnd) {
+    char* tokEnd = tokBegin;
+  continue_search:
+    tokEnd = NextStopChar(tokEnd, style);
+    if (tokEnd == NULL)
+      tokEnd = lineEnd;
+    else if (tokEnd > line && *tokEnd != ' ' && tokEnd[-1] == '\\') {
+      ++tokEnd;
+      goto continue_search;
+    }
+
+    size_t tokenLength = tokEnd - tokBegin;
+    if (*tokEnd == ' ')
+      ++tokenLength;
+    else if (tokenLength == 0)
+      goto next_token;
+
+    TextToken* tok = ArenaAlloc(sizeof(*tok) + tokenLength + 1);
+    if (tok == NULL)
+      break;
+
+    tok->length = tokenLength;
+
+    strncpy(tok->string, tokBegin, tok->length);
+    tok->string[tok->length] = '\0';
+
+    /* Remove \ escape characters */
+    StripEscapeCharacters(tok->string, tokenLength);
+
+    tok->next = NULL;
+    tok->style = *style;
+    tok->width = TokenWidth(tok, fontSize);
+    tok->joinWithNext = *tokEnd != '\0' && *tokEnd != ' ';
+
+    if (*tokEnd == ' ') {
+      tok->string[tok->length - 1] = '\0';
+      tok->spaceWidth =  tok->width - TokenWidth(tok, fontSize);
+      tok->string[tok->length - 1] = ' ';
+    } else
+      tok->spaceWidth = 0.0f;
+
+    if /**/ (firstToken == NULL)
+      firstToken = tok;
+    else if (lastToken != NULL)
+      lastToken->next = tok;
+
+    lastToken = tok;
+
+  next_token:
+    /* Update style */
+    tokBegin = MaybeUpdateStyle(tokEnd, style);
+  }
+
+  return firstToken;
+}
+
+static TextToken* DrawTokenChain(TextToken* tok, Vector2* cursor, int fontSize) {
+  TokenDraw(tok, cursor, fontSize);
+  if (tok->joinWithNext) {
+    for (tok = tok->next; tok != NULL; tok = tok->next) {
+      TokenDraw(tok, cursor, fontSize);
+      if (!tok->joinWithNext)
+        break;
+    }
+  }
+  return tok;
+}
+
+static float GetTokenChainWidth(TextToken* tok, TextToken** lastToken) {
+  float width = tok->width;
+  TextToken* last = tok;
+  if (tok->joinWithNext) {
+    for (tok = tok->next; tok != NULL; tok = tok->next) {
+      width += tok->width;
+      last = tok;
+      if (!tok->joinWithNext)
+        break;
+    }
+  }
+
+  *lastToken = last;
+  return width;
+}
+
+void SlideText(const char* txt) {
+  TextStyle style;
   int fontSize = SlideShowGetTextFontSize();
   Rectangle rect = SlideSplitRect();
   const float lineHeight = fontSize + 4.0f;
-  const float spaceWidth = MeasureTextEx(font, " ", fontSize, 1.0f).x;
+
+  /* Set initial font style */
+  style.bold = 0;
+  style.italic = 0;
+  style.underline = 0;
+  style.code = 0;
+  {
+    Color c = SlideShowGetPrimaryColor();
+    style.colorRed   = c.r;
+    style.colorGreen = c.g;
+    style.colorBlue  = c.b;
+  }
 
   BeginScissorMode(rect.x, rect.y, rect.width, rect.height);
 
   ArenaPush();
 
-  char *text = ArenaStrdup(txt), *textEnd = text + strlen(text);
-
+  char *text = ArenaStrdup(txt);
   /* Split text into lines first */
-  char* p = text - 1;
-  while ((p = strpbrk(p + 1, "\n")) != NULL)
-    *p = '\0';
+  char* textEnd = SplitLines(text);
 
-  Vector2 pos = { rect.x, rect.y };
+  ArenaPush();
+
+  Vector2 cursor = { rect.x, rect.y };
   /* For every line in the text */
   char* lineEnd;
   for (char* line = text; line < textEnd; line = lineEnd + 1) {
     /* If the line is outside the rectangle, break out */
-    if (pos.y >= rect.y + rect.height)
+    if (cursor.y >= rect.y + rect.height)
       break;
 
     lineEnd = line + strlen(line);
     /* If the line is empty, increment the next line's Y coordinate and go to the next one */
-    if (lineEnd == line) {
-      pos.y += lineHeight;
-      continue;
-    }
+    if (lineEnd == line)
+      goto end;
 
-    /* Draw text line with wrapping */
-    for (;;) {
-      char* lineBreak = line - 1;
-      float lineWidth = 0.0f;
-      bool overflow = false;
-      while (lineBreak < lineEnd) {
-        char* newLineBreak = NextStopChar(lineBreak + 1, lineEnd);
-        char stopChar = newLineBreak[0];
+    TextToken* tok = Tokenize(line, lineEnd, &style, fontSize);
 
-        newLineBreak[0] = '\0';
-        float newLineWidth = TextWidth(font, line, fontSize);
-        TraceLog(LOG_INFO, "New line width %.2f (max width: %.2f, line = '%s', stopChar = %02x)", newLineWidth + (pos.x - rect.x), rect.width, line, stopChar);
-        newLineBreak[0] = stopChar;
+    while (tok != NULL) {
+      /* Compute joined width */
+      TextToken* lastToken;
+      float width = GetTokenChainWidth(tok, &lastToken);
 
-        if (pos.x + newLineWidth >= rect.x + rect.width) {
-          overflow = true;
-          break;
-        }
+      if (cursor.x + width > rect.x + rect.width) {
+        /* If the line doesn't end with a space, we overflow */
+        if (lastToken->string[lastToken->length - 1] != ' ')
+          goto overflow;
 
-        lineBreak = newLineBreak;
-        lineWidth = newLineWidth;
-
-        if (stopChar == '\0' || stopChar == COLOR_ESCAPE)
-          break;
+        float width2 = width - lastToken->spaceWidth;
+        /* If the line does end with a space, but we still don't fit in the line, we overflow */
+        if (cursor.x + width2 > rect.x + rect.width)
+          goto overflow;
       }
 
-      if (lineWidth <= 0.0f) {
-        assert(overflow);
-        goto overflow;
-      }
+      tok = DrawTokenChain(tok, &cursor, fontSize);
 
-      char stopChar = lineBreak[0];
-      lineBreak[0] = '\0';
-      TraceLog(LOG_INFO, "Drawing line '%s'", line);
-      DrawTextSDF(font, line, pos, fontSize, 1.0f, tint);
-      lineBreak[0] = stopChar;
+      if (tok != NULL)
+        tok = tok->next;
 
-      if (overflow) {
+      if (cursor.x >= rect.x + rect.width) {
       overflow:
-        pos.x = rect.x;
-        pos.y += lineHeight;
-        /* If the next line won't fit into the rectangle, we can exit out early */
-        if /**/ (pos.y >= rect.y + rect.height)
-          goto out;
-        /* We overflowed without parsing text, retry */
-        else if (lineWidth <= 0.0f)
-          goto skip_spaces;
-      } else {
-        pos.x += lineWidth;
-        /* If the stop char was a space, we have to account for it's width */
-        if (stopChar == ' ') {
-          pos.x += spaceWidth;
-          /* Check if we've overflowed thanks to the space */
-          if (pos.x >= rect.x + rect.width) {
-            overflow = true;
-            goto overflow;
-          }
-        }
-      }
-
-      /* End of line */
-      if (stopChar == '\0')
-        break;
-
-      /* Color sequence is next */
-      if /**/ (stopChar == COLOR_ESCAPE)
-        line = ParseColor(lineBreak, &tint);
-      else /* (stopChar == ' ') */ {
-        assert(overflow);
-        line = lineBreak + 1;
-        /* If we broke due to a space, skip extra spaces that would otherwise end up at the start of the new line */
-      skip_spaces:
-        while (isblank(*line))
-          ++line;
+        cursor.x = rect.x;
+        cursor.y += lineHeight;
+        if (cursor.y >= rect.y + rect.height)
+          break;
       }
     }
+    ArenaFree();
+
+  end:
+    cursor.x = rect.x;
+    cursor.y += lineHeight;
   }
-out:
+
+  ArenaPop();
 
   EndScissorMode();
 
   ArenaPop();
-}
-
-void SlideText(const char* text) {
-  SlideDrawText(SlideShowGetTextFont(), text);
-}
-
-void SlideCode(const char* text) {
-  SlideDrawText(SlideShowGetMonospacedFont(), text);
 }
 
 void SlideImage(Texture2D texture) {

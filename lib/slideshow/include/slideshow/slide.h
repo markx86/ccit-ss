@@ -39,10 +39,8 @@ void SlideImage(Texture2D texture);
 #define SlideSplit(direction) \
   for (int _ = SlideBeginSplit(direction); _; _ = SlideEndSplit())
 
-#define COLOR_ESCAPE '\33'
-
-#define TXTRGB(r, g, b) "\33" #r "," #g "," #b ";"
-#define TXTCOLOR(i)     "\33" #i ";"
-#define TXTRESET()      TXTCOLOR(0)
+#define CRGB(r, g, b) "\33" #r "," #g "," #b ";"
+#define CIDX(i)       "\33" #i ";"
+#define CRST()        CIDX(0)
 
 #endif

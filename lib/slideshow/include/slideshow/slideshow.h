@@ -31,9 +31,17 @@ struct _SlideShowFontSizes {
   size_t title;
 };
 
-Font SlideShowGetMonospacedFont(void);
-Font SlideShowGetTextFont(void);
-Font SlideShowGetTitleFont(void);
+typedef enum {
+  FONT_STYLE_REGULAR    = 0,
+  FONT_STYLE_BOLD       = 1,
+  FONT_STYLE_ITALIC     = 2,
+  FONT_STYLE_BOLDITALIC = 3 /* NOTE: Bold italic is FONT_STYLE_BOLD | FONT_STYLE_ITALIC */,
+  FONT_STYLE_MONOSPACED = 4,
+#define FONT_STYLE_MAX FONT_STYLE_MONOSPACED
+} FontStyle;
+
+int  SlideShowSetFont(int fontStyle, const char* file);
+Font SlideShowGetFont(int fontStyle);
 
 void   SlideShowSetFontSizes(size_t text, size_t title);
 void   SlideShowResetFontSizes(void);
@@ -55,16 +63,6 @@ Color SlideShowGetBackgroundColor(void);
   }
 
 #define DEFAULT_FONT NULL
-
-#define SLIDESHOW_FONTS(_text, _monospaced, _title) \
-  const struct _SlideShowFonts SlideShowFonts = {   \
-    .text = _text,                                  \
-    .monospaced = _monospaced,                      \
-    .title = _title                                 \
-  }
-
-#define SLIDESHOW_FONTS_DEFAULT() \
-  SLIDESHOW_FONTS(DEFAULT_FONT, DEFAULT_FONT, DEFAULT_FONT)
 
 #define DEFAULT_FONT_SIZE_TEXT  24
 #define DEFAULT_FONT_SIZE_TITLE 72

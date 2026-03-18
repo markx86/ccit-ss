@@ -7,38 +7,56 @@
 
 #include <raylib.h>
 
-extern struct _SlideShow SlideShow;
-extern const struct _SlideShowFonts SlideShowFonts;
+extern const struct _SlideShow SlideShow;
 extern const struct _SlideShowFontSizes SlideShowFontSizes;
 extern const struct _SlideShowColors SlideShowColors;
 
-typedef struct {
-  Font text, monospaced, title;
-} TextFonts;
+static struct {
+  Font normal[FONT_STYLE_MAX];
+  Font monospaced[FONT_STYLE_MAX];
+} CurrentFonts = {0};
+static struct _SlideShowFontSizes CurrentFontSizes = {0};
+static struct _SlideShowColors CurrentColors = {0};
 
-static TextFonts Fonts;
-static struct _SlideShowFontSizes FontSizes;
-static struct _SlideShowColors CurrentColors;
+int SlideShowSetFont(int fontStyle, const char* file) {
+  Font* array = fontStyle & FONT_STYLE_MONOSPACED ? CurrentFonts.monospaced : CurrentFonts.normal;
+  int fontIndex = fontStyle & 3;
+  if (fontIndex >= FONT_STYLE_MAX)
+    return 0;
 
-Font SlideShowGetMonospacedFont(void) { return Fonts.monospaced; }
-Font SlideShowGetTextFont(void)       { return Fonts.text;       }
-Font SlideShowGetTitleFont(void)      { return Fonts.title;      }
+  Font font = file == DEFAULT_FONT ? GetFontDefault() : LoadFontSDF(file);
+  if (!IsFontValid(font))
+    return 0;
+
+  Font* fontp = &array[fontIndex];
+  if (IsFontValid(*fontp))
+    UnloadFont(*fontp);
+
+  *fontp = font;
+  return 1;
+}
+
+Font SlideShowGetFont(int fontStyle) {
+  Font* array = fontStyle & FONT_STYLE_MONOSPACED ? CurrentFonts.monospaced : CurrentFonts.normal;
+  int fontIndex = fontStyle & 3;
+  return array[fontIndex];
+}
 
 Color SlideShowGetAccentColor(void)     { return CurrentColors.accent;     }
 Color SlideShowGetPrimaryColor(void)    { return CurrentColors.primary;    }
 Color SlideShowGetSecondaryColor(void)  { return CurrentColors.secondary;  }
 Color SlideShowGetBackgroundColor(void) { return CurrentColors.background; }
 
-size_t SlideShowGetTextFontSize(void)  { return FontSizes.text;  }
-size_t SlideShowGetTitleFontSize(void) { return FontSizes.title; }
+size_t SlideShowGetTextFontSize(void)  { return CurrentFontSizes.text;  }
+size_t SlideShowGetTitleFontSize(void) { return CurrentFontSizes.title; }
 
 void SlideShowSetFontSizes(size_t text, size_t title) {
-  FontSizes.text = text;
-  FontSizes.title = title;
+  CurrentFontSizes.text = text;
+  CurrentFontSizes.title = title;
 }
 
 void SlideShowResetFontSizes(void) {
-  FontSizes = SlideShowFontSizes;
+  CurrentFontSizes = SlideShowFontSizes;
 }
 
 void SlideShowSetColors(Color background, Color secondary, Color primary, Color accent) {
@@ -52,17 +70,12 @@ void SlideShowResetColors(void) {
   CurrentColors = SlideShowColors;
 }
 
-static Font LoadFontOrGetDefault(const char* fontPath) {
-  if (fontPath == NULL)
-    return GetFontDefault();
-  else
-    return LoadFontSDF(fontPath);
-}
-
 static void LoadFonts(void) {
-  Fonts.text     = LoadFontOrGetDefault(SlideShowFonts.text);
-  Fonts.monospaced = LoadFontOrGetDefault(SlideShowFonts.monospaced);
-  Fonts.title      = LoadFontOrGetDefault(SlideShowFonts.title);
+  Font defaultFont = GetFontDefault();
+  for (int i = 0; i < FONT_STYLE_MAX; ++i) {
+    CurrentFonts.normal[i] = defaultFont;
+    CurrentFonts.monospaced[i] = defaultFont;
+  }
 }
 
 static int IsKeyPressedOrRepeated(int key) {
@@ -71,7 +84,7 @@ static int IsKeyPressedOrRepeated(int key) {
 
 static void EndSlide(void) {
   ClearBackground(BLACK);
-  DrawTextSDF(Fonts.text, "End of the presentation.", (Vector2) { 32, 32 }, 32, 1, RAYWHITE);
+  DrawTextSDF(SlideShowGetFont(FONT_STYLE_BOLD), "End of the presentation.", (Vector2) { 32, 32 }, 32, 1, RAYWHITE);
 }
 
 static int DrawSlide(size_t slideIndex) {
