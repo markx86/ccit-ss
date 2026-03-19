@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <slideshow/slide.h>
 #include <slideshow/slideshow.h>
 
@@ -8,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <assert.h>
 
 struct {
   SlideSplit activeSplit;
@@ -164,11 +164,8 @@ int SlideBeginWithTitleEx(float padding, const char* title, Color titleColor) {
   if (!SlideBeginSplit(SLIDE_SPLIT_VERTICAL))
     return 0;
 
-  if (SlideSplitBySize(titleSize.y)) {
-    Rectangle r = SlideSplitRect();
-    Vector2 pos = { r.x, r.y };
-    DrawTextSDF(font, title, pos, fontSize, 1, titleColor);
-  }
+  if (SlideSplitBySize(titleSize.y))
+    SlideTextPro(title, fontSize, TextBuildStyle(1, 0, 0, 1, titleColor));
 
   SlideRebaseOnSplit();
   return 1;
@@ -182,17 +179,6 @@ static char* SplitLines(char* text) {
   return textEnd;
 }
 
-typedef struct {
-  int bold       : 1;
-  int italic     : 1;
-  int underline  : 1;
-  int code       : 1;
-  int _          : 4;
-  int colorRed   : 8;
-  int colorGreen : 8;
-  int colorBlue  : 8;
-} TextStyle;
-
 typedef struct TextToken {
   struct TextToken* next;
   TextStyle style;
@@ -204,6 +190,18 @@ typedef struct TextToken {
 } TextToken;
 
 #define COLOR_ESCAPE '\33'
+
+TextStyle TextBuildStyle(int bold, int italic, int monospaced, int underline, Color tint) {
+  return (TextStyle) {
+    .bold       = !!bold,
+    .italic     = !!italic,
+    .underline  = !!underline,
+    .code       = !!monospaced,
+    .colorRed   = tint.r,
+    .colorGreen = tint.g,
+    .colorBlue  = tint.b
+  };
+}
 
 static Font GetFontByStyle(TextStyle style) {
   int fontStyle = FONT_STYLE_REGULAR;
@@ -222,18 +220,19 @@ static Color GetColorByStyle(TextStyle style) {
 
 static float TokenWidth(TextToken* tok, int fontSize) {
   Font font = GetFontByStyle(tok->style);
-  return MeasureTextEx(font, tok->string, fontSize, 1.0f).x;
+  return MeasureTextEx(font, tok->string, fontSize, 1.0f).x + 1.0f /* end spacing */;
 }
 
 static void TokenDraw(TextToken* tok, Vector2* pos, int fontSize) {
   Color color = GetColorByStyle(tok->style);
-  DrawTextSDF(GetFontByStyle(tok->style), tok->string, *pos, fontSize, 1.0f, color);
+  DrawTextEx(GetFontByStyle(tok->style), tok->string, *pos, fontSize, 1.0f, color);
   if (tok->style.underline) {
     int y = pos->y + fontSize + 1;
     float width = tok->width;
-    if (!tok->joinWithNext)
+    /* If the next token shouldn't be underlined, do not underline the space inbetween */
+    if (tok->next != NULL && !tok->next->style.underline)
       width -= tok->spaceWidth;
-    DrawLine(pos->x, y, pos->x + width, y, color);
+    DrawLineEx((Vector2) { pos->x, y }, (Vector2) { pos->x + width, y }, 2.0f, color);
   }
   pos->x += tok->width;
 }
@@ -382,7 +381,7 @@ static TextToken* Tokenize(char* line, char* lineEnd, TextStyle* style, int font
       tok->spaceWidth =  tok->width - TokenWidth(tok, fontSize);
       tok->string[tok->length - 1] = ' ';
     } else
-      tok->spaceWidth = 0.0f;
+      tok->spaceWidth = 1.0f;
 
     if /**/ (firstToken == NULL)
       firstToken = tok;
@@ -427,26 +426,13 @@ static float GetTokenChainWidth(TextToken* tok, TextToken** lastToken) {
   return width;
 }
 
-void SlideText(const char* txt) {
-  return SlideTextEx(txt, SlideShowGetTextFontSize());
+static TextStyle GetDefaultTextStyle(void) {
+  return TextBuildStyle(0, 0, 0, 0, SlideShowGetPrimaryColor());
 }
 
-void SlideTextEx(const char* txt, int fontSize) {
-  TextStyle style;
+static void DrawTextImpl(const char* txt, int fontSize, TextStyle style) {
   Rectangle rect = SlideSplitRect();
-  const float lineHeight = fontSize + 4.0f;
-
-  /* Set initial font style */
-  style.bold = 0;
-  style.italic = 0;
-  style.underline = 0;
-  style.code = 0;
-  {
-    Color c = SlideShowGetPrimaryColor();
-    style.colorRed   = c.r;
-    style.colorGreen = c.g;
-    style.colorBlue  = c.b;
-  }
+  const float lineHeight = fontSize + 8.0f;
 
   BeginScissorMode(rect.x, rect.y, rect.width, rect.height);
 
@@ -514,6 +500,21 @@ void SlideTextEx(const char* txt, int fontSize) {
   EndScissorMode();
 
   ArenaPop();
+}
+
+void SlideText(const char* txt) {
+  return SlideTextEx(txt, SlideShowGetTextFontSize());
+}
+
+void SlideTextEx(const char* txt, int fontSize) {
+  SlideTextPro(txt, fontSize, GetDefaultTextStyle());
+}
+
+void SlideTextPro(const char* txt, int fontSize, TextStyle style) {
+  WithShaderSDF() {
+    /* NOTE: We do it like this to avoid binding and unbinding a shader every time we want to draw some text */
+    DrawTextImpl(txt, fontSize, style);
+  }
 }
 
 void SlideImage(Texture2D texture) {

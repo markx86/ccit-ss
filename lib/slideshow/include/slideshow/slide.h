@@ -18,6 +18,17 @@ typedef struct {
   SlideSplitDirection direction;
 } SlideSplit;
 
+typedef struct {
+  int bold       : 1;
+  int italic     : 1;
+  int underline  : 1;
+  int code       : 1;
+  int _          : 4;
+  int colorRed   : 8;
+  int colorGreen : 8;
+  int colorBlue  : 8;
+} TextStyle;
+
 int SlideBegin(float padding);
 int SlideBeginWithTitle(float padding, const char* title);
 int SlideBeginWithTitleEx(float padding, const char* title, Color titleColor);
@@ -35,7 +46,10 @@ void SlideRebaseOnSplit(void);
 
 void SlideText(const char* text);
 void SlideTextEx(const char* txt, int fontSize);
+void SlideTextPro(const char* txt, int fontSize, TextStyle style);
 void SlideImage(Texture2D texture);
+
+TextStyle TextBuildStyle(int bold, int italic, int monospaced, int underline, Color tint);
 
 #define SlideSplit(direction) \
   for (int _ = SlideBeginSplit(direction); _; _ = SlideEndSplit())

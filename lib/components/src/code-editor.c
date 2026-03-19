@@ -484,21 +484,23 @@ static void RenderLines(CodeEditor* codeEditor) {
   int lineHeight = codeEditor->linePadding + codeEditor->charHeight;
   Rectangle r = codeEditor->viewRect;
   Line* line = codeEditor->lines.head;
-
   Vector2 linePos = { r.x, r.y + codeEditor->linePadding };
-  for (int i = 0; i < codeEditor->numLines && line != NULL; ++i) {
-    snprintf(codeEditor->printBuffer, codeEditor->printBufferLength,
-             " %3d  %.*s", i + 1, line->length, line->chars);
 
-    DrawTextSDF(codeEditor->font,
-                codeEditor->printBuffer,
-                linePos,
-                codeEditor->fontSize,
-                codeEditor->spacing,
-                DARKGRAY);
+  WithShaderSDF() {
+    for (int i = 0; i < codeEditor->numLines && line != NULL; ++i) {
+      snprintf(codeEditor->printBuffer, codeEditor->printBufferLength,
+               " %3d  %.*s", i + 1, line->length, line->chars);
 
-    linePos.y += lineHeight;
-    line = line->next;
+      DrawTextEx(codeEditor->font,
+                 codeEditor->printBuffer,
+                 linePos,
+                 codeEditor->fontSize,
+                 codeEditor->spacing,
+                 DARKGRAY);
+
+      linePos.y += lineHeight;
+      line = line->next;
+    }
   }
 }
 

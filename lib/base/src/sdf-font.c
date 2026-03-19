@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 /* NOTE: This file has been stolen from raylib's SDF example */
-static const char* sdfFragmentShader =
+static const char* FragmentShaderSDF =
   "#version 330\n"
   "// Input vertex attributes (from vertex shader)\n"
   "in vec2 fragTexCoord;\n"
@@ -32,16 +32,17 @@ static const char* sdfFragmentShader =
 
 #define SDF_BASE_SIZE 32
 
-static Shader sdfShader = {0};
+static Shader ShaderSDF = {0};
+static int ShaderSDFActiveCounter = 0;
 
 void LoadSDFShader(void) {
-  if (!IsShaderValid(sdfShader))
-    sdfShader = LoadShaderFromMemory(NULL, sdfFragmentShader);
+  if (!IsShaderValid(ShaderSDF))
+    ShaderSDF = LoadShaderFromMemory(NULL, FragmentShaderSDF);
 }
 
 void UnloadSDFShader(void) {
-  if (IsShaderValid(sdfShader))
-    UnloadShader(sdfShader);
+  if (IsShaderValid(ShaderSDF))
+    UnloadShader(ShaderSDF);
 }
 
 Font LoadFontSDF(const char* fontPath) {
@@ -50,8 +51,8 @@ Font LoadFontSDF(const char* fontPath) {
 
   Font font = {0};
   font.baseSize = SDF_BASE_SIZE;
-  font.glyphCount = 95;
-  font.glyphs = LoadFontData(fileData, fileSize, font.baseSize, NULL, 0, FONT_SDF, &font.glyphCount);
+  font.glyphCount = 256; /* ASCII + Extended ASCII */
+  font.glyphs = LoadFontData(fileData, fileSize, font.baseSize, NULL, font.glyphCount, FONT_SDF, &font.glyphCount);
   Image atlas = GenImageFontAtlas(font.glyphs, &font.recs, font.glyphCount, font.baseSize, 0, 1);
   font.texture = LoadTextureFromImage(atlas);
   UnloadImage(atlas);
@@ -63,7 +64,18 @@ Font LoadFontSDF(const char* fontPath) {
 }
 
 void DrawTextSDF(Font font, const char *text, Vector2 position, float fontSize, float spacing, Color tint) {
-  BeginShaderMode(sdfShader);
+  EnableShaderSDF();
     DrawTextEx(font, text, position, fontSize, spacing, tint);
-  EndShaderMode();
+  DisableShaderSDF();
+}
+
+int EnableShaderSDF(void) {
+  if (ShaderSDFActiveCounter++ == 0) BeginShaderMode(ShaderSDF);
+  return 1;
+}
+
+int DisableShaderSDF(void) {
+  if (ShaderSDFActiveCounter > 0) --ShaderSDFActiveCounter;
+  if (ShaderSDFActiveCounter == 0) EndShaderMode();
+  return 0;
 }

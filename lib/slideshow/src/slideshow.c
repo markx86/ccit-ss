@@ -1,6 +1,5 @@
-#include "slideshow/slide.h"
 #include <slideshow/slideshow.h>
-
+#include <slideshow/slide.h>
 #include <base/sdf-font.h>
 #include <base/pak.h>
 #include <base/arena.h>
@@ -13,14 +12,21 @@ extern const struct _SlideShowFontSizes SlideShowFontSizes;
 extern const struct _SlideShowColors SlideShowColors;
 
 static struct {
-  Font normal[FONT_STYLE_MAX];
-  Font monospaced[FONT_STYLE_MAX];
-} CurrentFonts = {0};
-static struct _SlideShowFontSizes CurrentFontSizes = {0};
-static struct _SlideShowColors CurrentColors = {0};
+  size_t slideIndex;
+  int wasResized;
+  struct {
+    Font normal[FONT_STYLE_MAX];
+    Font monospaced[FONT_STYLE_MAX];
+  } fonts;
+  struct _SlideShowFontSizes fontSizes;
+  struct _SlideShowColors colors;
+} State = {0};
+
+int    SlideShowWasResized(void)            { return State.wasResized;     }
+size_t SlideShowGetCurrentSlideNumber(void) { return State.slideIndex + 1; }
 
 int SlideShowSetFont(int fontStyle, const char* file) {
-  Font* array = fontStyle & FONT_STYLE_MONOSPACED ? CurrentFonts.monospaced : CurrentFonts.normal;
+  Font* array = fontStyle & FONT_STYLE_MONOSPACED ? State.fonts.monospaced : State.fonts.normal;
   int fontIndex = fontStyle & 3;
   if (fontIndex >= FONT_STYLE_MAX)
     return 0;
@@ -38,48 +44,50 @@ int SlideShowSetFont(int fontStyle, const char* file) {
 }
 
 Font SlideShowGetFont(int fontStyle) {
-  Font* array = fontStyle & FONT_STYLE_MONOSPACED ? CurrentFonts.monospaced : CurrentFonts.normal;
+  Font* array = fontStyle & FONT_STYLE_MONOSPACED ? State.fonts.monospaced : State.fonts.normal;
   int fontIndex = fontStyle & 3;
   return array[fontIndex];
 }
 
-Color SlideShowGetAccentColor(void)     { return CurrentColors.accent;     }
-Color SlideShowGetPrimaryColor(void)    { return CurrentColors.primary;    }
-Color SlideShowGetSecondaryColor(void)  { return CurrentColors.secondary;  }
-Color SlideShowGetBackgroundColor(void) { return CurrentColors.background; }
+Color SlideShowGetAccentColor(void)     { return State.colors.accent;     }
+Color SlideShowGetPrimaryColor(void)    { return State.colors.primary;    }
+Color SlideShowGetSecondaryColor(void)  { return State.colors.secondary;  }
+Color SlideShowGetBackgroundColor(void) { return State.colors.background; }
 
-size_t SlideShowGetTextFontSize(void)  { return CurrentFontSizes.text;  }
-size_t SlideShowGetTitleFontSize(void) { return CurrentFontSizes.title; }
+size_t SlideShowGetTextFontSize(void)  { return State.fontSizes.text;  }
+size_t SlideShowGetTitleFontSize(void) { return State.fontSizes.title; }
 
 void SlideShowSetFontSizes(size_t text, size_t title) {
-  CurrentFontSizes.text = text;
-  CurrentFontSizes.title = title;
+  if (text > 16 && title > 16) {
+    State.fontSizes.text = text;
+    State.fontSizes.title = title;
+  }
 }
 
 void SlideShowResetFontSizes(void) {
-  CurrentFontSizes = SlideShowFontSizes;
+  State.fontSizes = SlideShowFontSizes;
 }
 
 void SlideShowSetColors(Color background, Color secondary, Color primary, Color accent) {
-  CurrentColors.background = background;
-  CurrentColors.secondary = secondary;
-  CurrentColors.primary = primary;
-  CurrentColors.accent = accent;
+  State.colors.background = background;
+  State.colors.secondary = secondary;
+  State.colors.primary = primary;
+  State.colors.accent = accent;
 }
 
 void SlideShowResetColors(void) {
-  CurrentColors = SlideShowColors;
+  State.colors = SlideShowColors;
 }
 
 static void LoadFonts(void) {
   Font defaultFont = GetFontDefault();
   for (int i = 0; i < FONT_STYLE_MAX; ++i) {
-    CurrentFonts.normal[i] = defaultFont;
-    CurrentFonts.monospaced[i] = defaultFont;
+    State.fonts.normal[i] = defaultFont;
+    State.fonts.monospaced[i] = defaultFont;
   }
 }
 
-static int IsKeyPressedOrRepeated(int key) {
+static int KeyPressed(int key) {
   return IsKeyPressed(key) || IsKeyPressedRepeat(key);
 }
 
@@ -88,39 +96,43 @@ static void EndSlide(void) {
   SlideBeginWithTitleEx(64.0f, "End of the presentation.", RAYWHITE);
 }
 
-static int DrawSlide(size_t slideIndex) {
-  if (slideIndex >= SlideShow.numSlides) {
+static int DrawCurrentSlide(void) {
+  if (State.slideIndex >= SlideShow.numSlides) {
     EndSlide();
     return 0;
   }
 
-  ClearBackground(CurrentColors.background);
-  return SlideShow.slides[slideIndex](slideIndex + 1);
+  ClearBackground(State.colors.background);
+  return SlideShow.slides[State.slideIndex]();
 }
 
-static int SlideShowInput(size_t* currentSlide) {
-  size_t initialValue = *currentSlide;
+static int SlideShowInput(void) {
+  size_t initialValue = State.slideIndex;
 
-  if /**/ (IsKeyPressedOrRepeated(KEY_LEFT)
-           && *currentSlide > 0)
-    --(*currentSlide);
-  else if (IsKeyPressedOrRepeated(KEY_RIGHT)
-           && *currentSlide < SlideShow.numSlides)
-    ++(*currentSlide);
+  if /**/ (KeyPressed(KEY_LEFT)  && State.slideIndex > 0)
+    --State.slideIndex;
+  else if (KeyPressed(KEY_RIGHT) && State.slideIndex < SlideShow.numSlides)
+    ++State.slideIndex;
 
   if /**/ (IsKeyPressed(KEY_HOME))
-    *currentSlide = 0;
+    State.slideIndex = 0;
   else if (IsKeyPressed(KEY_END))
-    *currentSlide = SlideShow.numSlides - 1;
+    State.slideIndex = SlideShow.numSlides - 1;
 
-  return initialValue != *currentSlide;
+  if (IsKeyDown(KEY_RIGHT_CONTROL)) {
+    if /**/ (KeyPressed(KEY_RIGHT_BRACKET))
+      SlideShowSetFontSizes(State.fontSizes.text + 1, State.fontSizes.title + 1);
+    else if (KeyPressed(KEY_LEFT_BRACKET))
+      SlideShowSetFontSizes(State.fontSizes.text - 1, State.fontSizes.title - 1);
+  }
+
+  return initialValue != State.slideIndex;
 }
 
 int main(void) {
-  size_t currentSlide;
-
-  SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
-  InitWindow(800, 600, "Software Security 0");
+  // SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
+  SetConfigFlags(FLAG_VSYNC_HINT);
+  InitWindow(1280, 720, "Raylib SlideShow");
 
   LoadPakFile();
   LoadSDFShader();
@@ -136,11 +148,12 @@ int main(void) {
     goto fail;
   }
 
-  currentSlide = 0;
   while (!WindowShouldClose()) {
     BeginDrawing();
 
-    if (!DrawSlide(currentSlide) && SlideShowInput(&currentSlide)) {
+    State.wasResized = IsWindowResized();
+
+    if (!DrawCurrentSlide() && SlideShowInput()) {
       /* If we changed slides, deallocate all the memory int the arena */
       ArenaReset();
     }

@@ -4,7 +4,7 @@
 #include <raylib.h>
 #include <stddef.h>
 
-typedef int (*SlideFunc)(size_t);
+typedef int (*SlideFunc)(void);
 
 struct _SlideShow {
   int    (*init)(void);
@@ -39,6 +39,9 @@ typedef enum {
   FONT_STYLE_MONOSPACED = 4,
 #define FONT_STYLE_MAX FONT_STYLE_MONOSPACED
 } FontStyle;
+
+size_t SlideShowGetCurrentSlideNumber(void);
+int    SlideShowWasResized(void);
 
 int  SlideShowSetFont(int fontStyle, const char* file);
 Font SlideShowGetFont(int fontStyle);
