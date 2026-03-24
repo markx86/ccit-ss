@@ -3,6 +3,8 @@ project(components C)
 
 add_library(components STATIC
   src/code-editor.c
+  src/number-field.c
+  src/reg-view.c
 )
 
 target_include_directories(components PUBLIC
@@ -13,4 +15,5 @@ target_include_directories(components PUBLIC
 target_link_libraries(components
   base
   raylib
+  raygui
 )
