@@ -11,27 +11,7 @@ endif()
 
 message(STATUS "Building with '${CMAKE_BUILD_TYPE}' profile")
 
-# Build raylib
-set(BUILD_EXAMPLES FALSE)
-set(BUILD_SHARED_LIBS OFF)
-add_subdirectory(thirdparty/raylib)
-target_compile_definitions(raylib PUBLIC
-  -DSUPPORT_FILEFORMAT_JPG
-)
-
-# Build raygui
-add_subdirectory(thirdparty/raygui)
-
-# Build keystone
-set(BUILD_LIBS_ONLY TRUE)
-set(LLVM_TARGETS_TO_BUILD "X86")
-set(BUILD_SHARED_LIBS OFF)
-add_subdirectory(thirdparty/keystone)
-# NOTE: This is a fix for keystone's include directories
-target_include_directories(keystone PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/keystone/include>
-  $<INSTALL_INTERFACE:thirdparty/keystone/include>
-)
+add_subdirectory(thirdparty)
 
 # Set compiler options
 add_compile_options(-Wall -Wextra)

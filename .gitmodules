@@ -4,3 +4,6 @@
 [submodule "thirdparty/keystone"]
 	path = thirdparty/keystone
 	url = https://github.com/redthing1/keystone.git
+[submodule "thirdparty/nanosvg"]
+	path = thirdparty/nanosvg
+	url = https://github.com/memononen/nanosvg.git
