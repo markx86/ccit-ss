@@ -130,9 +130,11 @@ static int SlideShowInput(void) {
 }
 
 int main(void) {
-  // SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
-  SetConfigFlags(FLAG_VSYNC_HINT);
+  SetConfigFlags(/*FLAG_WINDOW_RESIZABLE |*/ FLAG_VSYNC_HINT);
   InitWindow(1280, 720, "Raylib SlideShow");
+
+  /* Disable exit key */
+  SetExitKey(KEY_NULL);
 
   LoadPakFile();
   LoadSDFShader();
