@@ -21,11 +21,11 @@ static void InitActiveSplit(Rectangle view, SlideSplitDirection direction) {
   Slide.activeSplit.freeRect = view;
   Slide.activeSplit.direction = direction;
   switch (Slide.activeSplit.direction) {
-    case SLIDE_SPLIT_VERTICAL:
+    case SLIDE_SPLIT_HORIZONTAL:
       Slide.activeSplit.lastRect.width = view.width;
       Slide.activeSplit.lastRect.height = 0.0f;
       break;
-    case SLIDE_SPLIT_HORIZONTAL:
+    case SLIDE_SPLIT_VERTICAL:
       Slide.activeSplit.lastRect.width = 0.0f;
       Slide.activeSplit.lastRect.height = view.height;
       break;
@@ -54,7 +54,7 @@ static int SplitCurrentRect(float w, float h) {
     case SLIDE_SPLIT_NONE:
       /* Cannot split this slide */
       return 0;
-    case SLIDE_SPLIT_VERTICAL:
+    case SLIDE_SPLIT_HORIZONTAL:
       split = (Rectangle) {
         Slide.activeSplit.freeRect.x,
         Slide.activeSplit.freeRect.y,
@@ -68,7 +68,7 @@ static int SplitCurrentRect(float w, float h) {
         Slide.activeSplit.freeRect.height - h - Slide.padding,
       };
       break;
-    case SLIDE_SPLIT_HORIZONTAL:
+    case SLIDE_SPLIT_VERTICAL:
       split = (Rectangle) {
         Slide.activeSplit.freeRect.x,
         Slide.activeSplit.freeRect.y,
@@ -161,7 +161,7 @@ int SlideBeginWithTitleEx(float padding, const char* title, Color titleColor) {
   int fontSize = SlideShowGetTitleFontSize();
   Vector2 titleSize = MeasureTextEx(font, title, fontSize, 1);
 
-  if (!SlideBeginSplit(SLIDE_SPLIT_VERTICAL))
+  if (!SlideBeginSplit(SLIDE_SPLIT_HORIZONTAL))
     return 0;
 
   if (SlideSplitBySize(titleSize.y))

@@ -7,8 +7,8 @@
 
 typedef enum {
   SLIDE_SPLIT_NONE,
-  SLIDE_SPLIT_VERTICAL,
   SLIDE_SPLIT_HORIZONTAL,
+  SLIDE_SPLIT_VERTICAL,
 } SlideSplitDirection;
 
 typedef struct {
