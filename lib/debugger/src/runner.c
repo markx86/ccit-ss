@@ -1,9 +1,10 @@
 #include <runner/runner.h>
 
-#include <signal.h>
+#include <stdio.h>
 #include <stdint.h>
-#include <sys/ptrace.h>
+#include <signal.h>
 #include <unistd.h>
+#include <sys/ptrace.h>
 #include <sys/mman.h>
 
 static int ReadRequest(RunnerRequest* request) {
@@ -43,6 +44,11 @@ int main(void) {
   RunnerRequest request;
   RunnerResponse response;
 
+  /* Send OK signal to parent */
+  rc = 0;
+  if (write(2, &rc, sizeof(rc)) != sizeof(rc))
+    return -1;
+
   /* If we fail in any of these steps,
    * the response will have a NULL shellcode address.
    */
@@ -71,10 +77,6 @@ int main(void) {
     if (rc < 0)
       goto fail;
   }
-
-  rc = ptrace(PTRACE_TRACEME, 0, 0, 0);
-  if (rc < 0)
-    goto fail;
 
   /* We stop the process here and wait for the parent */
   rc = raise(SIGSTOP);

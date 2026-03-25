@@ -13,7 +13,6 @@ extern const struct _SlideShowColors SlideShowColors;
 
 static struct {
   size_t slideIndex;
-  int wasResized;
   struct {
     Font normal[FONT_STYLE_MAX];
     Font monospaced[FONT_STYLE_MAX];
@@ -22,7 +21,6 @@ static struct {
   struct _SlideShowColors colors;
 } State = {0};
 
-int    SlideShowWasResized(void)            { return State.wasResized;     }
 size_t SlideShowGetCurrentSlideNumber(void) { return State.slideIndex + 1; }
 
 int SlideShowSetFont(int fontStyle, const char* file) {
@@ -152,8 +150,6 @@ int main(void) {
 
   while (!WindowShouldClose()) {
     BeginDrawing();
-
-    State.wasResized = IsWindowResized();
 
     if (!DrawCurrentSlide() && SlideShowInput()) {
       /* If we changed slides, deallocate all the memory int the arena */

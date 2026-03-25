@@ -9,14 +9,16 @@ typedef enum {
   SLIDE_SPLIT_NONE,
   SLIDE_SPLIT_HORIZONTAL,
   SLIDE_SPLIT_VERTICAL,
-} SlideSplitDirection;
+} SlideSplitMode;
 
-typedef struct {
-  Rectangle view;
-  Rectangle freeRect;
-  Rectangle lastRect;
-  SlideSplitDirection direction;
-} SlideSplit;
+typedef enum {
+  SLIDE_SPLIT_NORMAL_ORDER,
+  SLIDE_SPLIT_REVERSE_ORDER
+#define SLIDE_SPLIT_TOP2BOTTOM SLIDE_SPLIT_NORMAL_ORDER
+#define SLIDE_SPLIT_BOTTOM2TOP SLIDE_SPLIT_REVERSE_ORDER
+#define SLIDE_SPLIT_LEFT2RIGHT SLIDE_SPLIT_NORMAL_ORDER
+#define SLIDE_SPLIT_RIGHT2LEFT SLIDE_SPLIT_REVERSE_ORDER
+} SlideSplitDirection;
 
 typedef struct {
   int bold       : 1;
@@ -40,7 +42,8 @@ int SlideSplitBySize(int pixels);
 int SlideSplitHalf(void);
 int SlideSplitRemaining(void);
 
-int  SlideBeginSplit(int splitDirection);
+int  SlideBeginSplit(int splitMode);
+int  SlideBeginSplitEx(int splitMode, int splitDirection);
 int  SlideEndSplit(void);
 void SlideRebaseOnSplit(void);
 
@@ -51,8 +54,11 @@ void SlideImage(Texture2D texture);
 
 TextStyle TextBuildStyle(int bold, int italic, int monospaced, int underline, Color tint);
 
-#define SlideSplit(direction) \
-  for (int _ = SlideBeginSplit(direction); _; _ = SlideEndSplit())
+#define SlideSplit(mode) \
+  for (int _ = SlideBeginSplit(mode); _; _ = SlideEndSplit())
+
+#define SlideSplitEx(mode, direction) \
+  for (int _ = SlideBeginSplitEx(mode, direction); _; _ = SlideEndSplit())
 
 #define CRGB(r, g, b) "\33" #r "," #g "," #b ";"
 #define CIDX(i)       "\33" #i ";"

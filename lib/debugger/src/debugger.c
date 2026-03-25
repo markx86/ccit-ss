@@ -7,9 +7,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <syscall.h>
+#include <errno.h>
 #include <sys/wait.h>
 #include <sys/ptrace.h>
 #include <sys/user.h>
+#include <linux/limits.h>
 
 typedef union {
   int raw[2];
@@ -40,6 +42,8 @@ struct Debugger {
   Breakpoint  breakpoints[MAX_BREAKPOINTS];
 };
 
+static char RunnerPath[PATH_MAX];
+
 static int CreatePipe(ProcPipe* pipeStruct) {
   return -(pipe(pipeStruct->raw) < 0);
 }
@@ -53,8 +57,12 @@ static int ExecRunner(ProcPipe* stdin, ProcPipe* stdout, ProcPipe* stderr) {
   dup2(stdout->write, 1);
   dup2(stderr->write, 2);
 
-  return execve("./runner",
-                (char*[]) { "./runner", NULL },
+  close(stdin->read);
+  close(stdout->write);
+  close(stderr->write);
+
+  return execve(RunnerPath,
+                (char*[]) { RunnerPath, NULL },
                 (char*[]) { NULL });
 }
 
@@ -62,22 +70,35 @@ static Runner* StartRunner(void) {
   ProcPipe stdinPipe, stdoutPipe, stderrPipe;
 
   if (CreatePipe(&stdinPipe) < 0 || CreatePipe(&stdoutPipe) < 0 || CreatePipe(&stderrPipe) < 0) {
-    fprintf(stderr, "Could not create pipes! %m");
+    fprintf(stderr, "Could not create pipes! %m\n");
     return NULL;
   }
 
   int pid = fork();
   if (pid < 0) {
-    fprintf(stderr, "Could not fork: %m");
+    fprintf(stderr, "Could not fork: %m\n");
     return NULL;
   }
 
   if (pid == 0) {
-    exit(ExecRunner(&stdinPipe, &stdoutPipe, &stderrPipe));
+    int rc = ExecRunner(&stdinPipe, &stdoutPipe, &stderrPipe);
+    int error = errno;
+    write(2, &error, sizeof(error));
+    exit(rc);
   } else {
     close(stdinPipe.read);
     close(stdoutPipe.write);
     close(stderrPipe.write);
+  }
+
+  int error = 0;
+  if (read(stderrPipe.read, &error, sizeof(error)) != sizeof(error) || error != 0) {
+    fprintf(stderr, "Failed to start '%s': %s\n", RunnerPath, error == 0 ? "Broken pipe" : strerror(error));
+    /* Close the pipes */
+    close(stdinPipe.write);
+    close(stdoutPipe.read);
+    close(stderrPipe.read);
+    return NULL;
   }
 
   Runner* runner = calloc(1, sizeof(*runner));
@@ -103,19 +124,19 @@ static void* LoadShellcode(Runner* runner,
   };
 
   if (write(runner->stdin, &request, sizeof(request)) < 0) {
-    fprintf(stderr, "Could not send initialization data to runner! %m");
+    fprintf(stderr, "Could not send initialization data to runner! %m\n");
     return NULL;
   }
 
   if (write(runner->stdin, shellcode, shellcodeLength) < 0) {
-    fprintf(stderr, "Could not load shellcode! %m");
+    fprintf(stderr, "Could not load shellcode! %m\n");
     return NULL;
   }
 
   RunnerResponse response;
   if (read(runner->stdout, &response, sizeof(response)) < 0
       || response.shellcodeAddress == NULL) {
-    fprintf(stderr, "Could not initialize runner! %m");
+    fprintf(stderr, "Could not initialize runner! %m\n");
     return NULL;
   }
 
@@ -142,7 +163,7 @@ static int DebuggerPtrace(Debugger* debugger, int op,
 
 static Breakpoint* GetNextFreeBreakpoint(Debugger* debugger) {
   for (int i = 0; i < MAX_BREAKPOINTS; ++i) {
-    if (debugger->breakpoints[i].active)
+    if (!debugger->breakpoints[i].active)
       return &debugger->breakpoints[i];
   }
   return NULL;
@@ -261,6 +282,10 @@ static int HasHitBreakpoint(Debugger* debugger) {
   return 0;
 }
 
+void DebuggerSetRunnerPath(const char* runnerPath) {
+  strncpy(RunnerPath, runnerPath, sizeof(RunnerPath));
+}
+
 Debugger* DebugShellcode(const uint8_t* shellcode, size_t shellcodeLength, void* shellcodeAddress, int disableRWX) {
   Debugger* debugger;
   Runner* runner;
@@ -269,20 +294,41 @@ Debugger* DebugShellcode(const uint8_t* shellcode, size_t shellcodeLength, void*
     return NULL;
 
   runner = StartRunner();
-  if (runner == NULL)
+  if (runner == NULL) {
+    fputs("Could not start runner!\n", stderr);
     return NULL;
+  }
 
   debugger = calloc(1, sizeof(*debugger));
   assert(debugger != NULL);
 
+  debugger->runner = runner;
   debugger->shellcodeLength = shellcodeLength;
   debugger->shellcode = malloc(debugger->shellcodeLength);
   assert(debugger->shellcode != NULL);
   memcpy(debugger->shellcode, shellcode, debugger->shellcodeLength);
 
   debugger->shellcodeAddress = LoadShellcode(runner, shellcode, shellcodeLength, shellcodeAddress, disableRWX);
-  if (debugger->shellcodeAddress == NULL)
+  if (debugger->shellcodeAddress == NULL) {
+    fputs("Could not load shellcode!\n", stderr);
     goto fail;
+  }
+
+  if (DebuggerPtrace(debugger, PTRACE_ATTACH, 0, 0) < 0) {
+    fprintf(stderr, "Could not attach to runner: %m\n");
+    goto fail;
+  }
+
+  int childTerminated = 0;
+  if (WaitChild(debugger, &childTerminated) < 0) {
+    fprintf(stderr, "Could not wait for runner: %m\n");
+    goto fail;
+  }
+
+  if (childTerminated) {
+    fputs("Runner exited early.", stderr);
+    goto fail;
+  }
 
   return debugger;
 fail:
@@ -343,7 +389,7 @@ int DebuggerMemWrite(Debugger* debugger, void* address, const void* buffer, size
   for (size_t i = 0; i < words; ++i) {
     data = *(void**)bufp;
     if (DebuggerPtrace(debugger, PTRACE_POKEDATA, addr, data) < 0) {
-      fprintf(stderr, "Could not write process memory @ %p! %m", addr);
+      fprintf(stderr, "Could not write process memory @ %p! %m\n", addr);
       return -1;
     }
     addr += sizeof(void*);
@@ -351,14 +397,14 @@ int DebuggerMemWrite(Debugger* debugger, void* address, const void* buffer, size
   }
 
   if (DebuggerPtrace(debugger, PTRACE_PEEKDATA, addr, &data) < 0) {
-    fprintf(stderr, "Could not read process memory @ %p! %m", addr);
+    fprintf(stderr, "Could not read process memory @ %p! %m\n", addr);
     return -1;
   }
 
   memcpy(&data, bufp, bufferLength - words*sizeof(void*));
 
   if (DebuggerPtrace(debugger, PTRACE_POKEDATA, addr, data) < 0) {
-    fprintf(stderr, "Could not write process memory @ %p! %m", addr);
+    fprintf(stderr, "Could not write process memory @ %p! %m\n", addr);
     return -1;
   }
 
@@ -373,7 +419,7 @@ int DebuggerMemRead(Debugger* debugger, void* address, void* buffer, size_t buff
 
   for (size_t i = 0; i < words; ++i) {
     if (DebuggerPtrace(debugger, PTRACE_PEEKDATA, addr, &data) < 0) {
-      fprintf(stderr, "Could not read process memory @ %p! %m", addr);
+      fprintf(stderr, "Could not read process memory @ %p! %m\n", addr);
       return -1;
     }
     *(long*)bufp = data;
@@ -382,7 +428,7 @@ int DebuggerMemRead(Debugger* debugger, void* address, void* buffer, size_t buff
   }
 
   if (DebuggerPtrace(debugger, PTRACE_PEEKDATA, addr, &data) < 0) {
-    fprintf(stderr, "Could not read process memory @ %p! %m", addr);
+    fprintf(stderr, "Could not read process memory @ %p! %m\n", addr);
     return -1;
   }
 

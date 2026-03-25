@@ -9,18 +9,27 @@
 #include <ctype.h>
 #include <assert.h>
 
+typedef struct {
+  Rectangle view;
+  Rectangle freeRect;
+  Rectangle lastRect;
+  SlideSplitMode mode;
+  SlideSplitDirection direction;
+} SlideSplitData;
+
 struct {
-  SlideSplit activeSplit;
+  SlideSplitData activeSplit;
   float padding;
   int numActiveSplits;
-  SlideSplit activeSplits[SLIDE_MAX_SPLITS];
+  SlideSplitData activeSplits[SLIDE_MAX_SPLITS];
 } Slide;
 
-static void InitActiveSplit(Rectangle view, SlideSplitDirection direction) {
+static void InitActiveSplit(Rectangle view, SlideSplitMode mode, SlideSplitDirection direction) {
   Slide.activeSplit.view = view;
   Slide.activeSplit.freeRect = view;
+  Slide.activeSplit.mode = mode;
   Slide.activeSplit.direction = direction;
-  switch (Slide.activeSplit.direction) {
+  switch (Slide.activeSplit.mode) {
     case SLIDE_SPLIT_HORIZONTAL:
       Slide.activeSplit.lastRect.width = view.width;
       Slide.activeSplit.lastRect.height = 0.0f;
@@ -50,7 +59,7 @@ static void PopSplit(void) {
 static int SplitCurrentRect(float w, float h) {
   Rectangle newRect;
   Rectangle split;
-  switch (Slide.activeSplit.direction) {
+  switch (Slide.activeSplit.mode) {
     case SLIDE_SPLIT_NONE:
       /* Cannot split this slide */
       return 0;
@@ -109,7 +118,25 @@ int SlideSplitRemaining(void) {
 }
 
 Rectangle SlideSplitRect(void) {
-  return Slide.activeSplit.lastRect;
+  Rectangle rect = Slide.activeSplit.lastRect;
+
+  /* Mirror the rect if we are in reverse mode */
+  if (Slide.activeSplit.direction == SLIDE_SPLIT_REVERSE_ORDER) {
+    switch (Slide.activeSplit.mode) {
+      case SLIDE_SPLIT_NONE:
+        break;
+
+      case SLIDE_SPLIT_HORIZONTAL:
+        rect.y = (Slide.activeSplit.view.y + Slide.activeSplit.view.height) - (rect.y + rect.height) + Slide.padding;
+        break;
+
+      case SLIDE_SPLIT_VERTICAL:
+        rect.x = (Slide.activeSplit.view.x + Slide.activeSplit.view.width) - (rect.x + rect.width) + Slide.padding;
+        break;
+    }
+  }
+
+  return rect;
 }
 
 int SlideBegin(float padding) {
@@ -125,17 +152,21 @@ int SlideBegin(float padding) {
 
   Slide.padding = padding;
   Slide.numActiveSplits = 0;
-  InitActiveSplit(view, SLIDE_SPLIT_NONE);
+  InitActiveSplit(view, SLIDE_SPLIT_NONE, SLIDE_SPLIT_NORMAL_ORDER);
 
   return 1;
 }
 
-int SlideBeginSplit(int splitDirection) {
-  Rectangle view = Slide.activeSplit.lastRect;
+int SlideBeginSplit(int splitMode) {
+  return SlideBeginSplitEx(splitMode, SLIDE_SPLIT_NORMAL_ORDER);
+}
+
+int SlideBeginSplitEx(int splitMode, int splitDirection) {
+  Rectangle view = SlideSplitRect();
   if (!PushSplit())
     return 0;
 
-  InitActiveSplit(view, splitDirection);
+  InitActiveSplit(view, splitMode, splitDirection);
   return 1;
 }
 
@@ -146,7 +177,7 @@ int SlideEndSplit(void) {
 
 void SlideRebaseOnSplit(void) {
   Slide.numActiveSplits = 0;
-  InitActiveSplit(Slide.activeSplit.freeRect, SLIDE_SPLIT_NONE);
+  InitActiveSplit(Slide.activeSplit.freeRect, SLIDE_SPLIT_NONE, SLIDE_SPLIT_NORMAL_ORDER);
 }
 
 int SlideBeginWithTitle(float padding, const char* title) {

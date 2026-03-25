@@ -41,7 +41,6 @@ typedef enum {
 } FontStyle;
 
 size_t SlideShowGetCurrentSlideNumber(void);
-int    SlideShowWasResized(void);
 
 int  SlideShowSetFont(int fontStyle, const char* file);
 Font SlideShowGetFont(int fontStyle);

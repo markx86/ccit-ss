@@ -60,6 +60,8 @@ typedef struct {
   uint8_t  active;
 } Breakpoint;
 
+void DebuggerSetRunnerPath(const char* runnerPath);
+
 Debugger* DebugShellcode(const uint8_t* shellcode, size_t shellcodeLength, void* shellcodeAddress, int disableRWX);
 void DebuggerFree(Debugger* debugger);
 int  DebuggerWait(Debugger* debugger);

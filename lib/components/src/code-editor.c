@@ -188,12 +188,17 @@ void CodeEditorDestroy(CodeEditor* codeEditor) {
   MemFree(codeEditor);
 }
 
-int CodeEditorResizeView(CodeEditor* codeEditor, int width, int height) {
-  if (width <= 0 || height <= 0)
-    return 0;
+int CodeEditorSetBounds(CodeEditor* codeEditor, Rectangle bounds) {
+  if (codeEditor->viewRect.x != bounds.x)
+    codeEditor->viewRect.x = bounds.x;
+  if (codeEditor->viewRect.y != bounds.y)
+    codeEditor->viewRect.y = bounds.y;
 
-  codeEditor->viewRect.width = width;
-  codeEditor->viewRect.height = height;
+  if (codeEditor->viewRect.width == bounds.width && codeEditor->viewRect.height == bounds.height)
+    return 1;
+
+  codeEditor->viewRect.width = bounds.width;
+  codeEditor->viewRect.height = bounds.height;
   return RecomputeCharSize(codeEditor);
 }
 
@@ -521,11 +526,6 @@ void CodeEditorRender(CodeEditor* codeEditor) {
     RenderLines(codeEditor);
   }
   EndScissorMode();
-}
-
-void CodeEditorSetPosition(CodeEditor* codeEditor, int x, int y) {
-  codeEditor->viewRect.x = x;
-  codeEditor->viewRect.y = y;
 }
 
 void CodeEditorSetEditable(CodeEditor* codeEditor, int yes) {
