@@ -330,6 +330,26 @@ Debugger* DebugShellcode(const uint8_t* shellcode, size_t shellcodeLength, void*
     goto fail;
   }
 
+  if (DebuggerSetBreakpoint(debugger, debugger->shellcodeAddress) < 0) {
+    fprintf(stderr, "Could not set initial breakpoint @ %p!\n", debugger->shellcodeAddress);
+    goto fail;
+  }
+
+  const Breakpoint* brk;
+  do {
+    if (DebuggerContinue(debugger) < 0) {
+      fputs("Could not continue to shellcode start!\n", stderr);
+      goto fail;
+    }
+
+    if (DebuggerWait(debugger) < 0) {
+      fputs("Could not reach the start of the shellcode!\n", stderr);
+      goto fail;
+    }
+
+    brk = DebuggerGetCurrentBreakpoint(debugger);
+  } while (brk == NULL || brk->offset != 0);
+
   return debugger;
 fail:
   DebuggerFree(debugger);

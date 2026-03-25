@@ -105,7 +105,7 @@ static int DrawCurrentSlide(void) {
 }
 
 static int SlideShowInput(void) {
-  size_t initialValue = State.slideIndex;
+  size_t initialIndex = State.slideIndex;
 
   if /**/ (KeyPressed(KEY_LEFT)  && State.slideIndex > 0)
     --State.slideIndex;
@@ -124,7 +124,7 @@ static int SlideShowInput(void) {
       SlideShowSetFontSizes(State.fontSizes.text - 1, State.fontSizes.title - 1);
   }
 
-  return initialValue != State.slideIndex;
+  return initialIndex != State.slideIndex;
 }
 
 int main(void) {
