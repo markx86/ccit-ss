@@ -1342,7 +1342,7 @@ SLIDESHOW(
   Slide20,
   Slide21,
   Slide22,
-  Slide23
+  // Slide23
 );
 
 SLIDESHOW_FONT_SIZES_DEFAULT();
