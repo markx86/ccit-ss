@@ -401,8 +401,8 @@ static int Slide6(void) {
 
         float borderWidth = cell.width * 0.05f;
 
-        char cellText[5];
-        char addressText[7];
+        char cellText[32];
+        char addressText[32];
 
         Font font = SlideShowGetFont(FONT_STYLE_MONOSPACED);
         float cellFontSize = cell.height * 0.33f;
@@ -1342,7 +1342,7 @@ SLIDESHOW(
   Slide20,
   Slide21,
   Slide22,
-  // Slide23
+  Slide23
 );
 
 SLIDESHOW_FONT_SIZES_DEFAULT();

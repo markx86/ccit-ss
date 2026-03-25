@@ -283,7 +283,7 @@ static int HasHitBreakpoint(Debugger* debugger) {
 }
 
 void DebuggerSetRunnerPath(const char* runnerPath) {
-  strncpy(RunnerPath, runnerPath, sizeof(RunnerPath));
+  strncpy(RunnerPath, runnerPath, sizeof(RunnerPath)-1);
 }
 
 Debugger* DebugShellcode(const uint8_t* shellcode, size_t shellcodeLength, void* shellcodeAddress, int disableRWX) {
