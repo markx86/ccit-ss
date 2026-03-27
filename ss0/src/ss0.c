@@ -44,12 +44,8 @@ static int CompileAssembly(const char* src, Debugger** debugger) {
   *debugger = DebugShellcode(shellcode, shellcode_size, (void*)0x13370000, false);
   if (*debugger == NULL)
     TraceLog(LOG_ERROR, "Could not create debugger!");
-  else {
-    DebuggerSetBreakpoint(*debugger, (void*)0x13370000);
-    DebuggerContinue(*debugger);
-    DebuggerWait(*debugger);
+  else
     TraceLog(LOG_INFO, "Compiled shellcode to %zu bytes! Processed %zu statements!", shellcode_size, stmts);
-  }
 
   ks_free(shellcode);
 
@@ -58,30 +54,6 @@ fail:
   ks_close(ksh);
   return rc;
 }
-
-// static int Slide1(size_t slideNumber) {
-//   (void)slideNumber;
-
-//   int inputProcessed = CodeEditorUpdate(codeEditor);
-
-//   CodeEditorRender(codeEditor);
-
-//   Rectangle r = CodeEditorGetRect(codeEditor);
-//   r.x += r.width + 24;
-//   r.width = 24*2;
-//   r.height = 24*2;
-
-//   GuiSetIconScale(2);
-//   if (GuiButton(r, "#141#")) {
-//     char* src = CodeEditorGetText(codeEditor);
-//     if (!CompileAssembly(src)) {
-//       TraceLog(LOG_ERROR, "Could not compile assembly:\n%s", src);
-//     }
-//     CodeEditorFreeText(src);
-//   }
-
-//   return inputProcessed;
-// }
 
 static char* ToBinary(unsigned long number, int bits, char paddingChar) {
 #define BINARY_BUFFERS  8
@@ -138,10 +110,9 @@ static int Slide1(void) {
     "\n"
     "`4.` La CPU\n"
     "\n"
-    "`5.` Il programma\n"
+    "`5.` Il sistema operativo\n"
     "\n"
-    "`6.` Il sistema operativo"
-    "\n"
+    "`6.` Il programma"
   );
 
 fail:
@@ -408,11 +379,8 @@ static int Slide6(void) {
         float cellFontSize = cell.height * 0.33f;
         float addressFontSize = cellFontSize * 0.66f;
 
-        Vector2 cellCharSize = MeasureTextEx(font, "A", cellFontSize, 1.0f);
-        float cellTextWidth = cellCharSize.x * (sizeof(cellText)-1);
-
-        Vector2 addressCharSize = MeasureTextEx(font, "A", addressFontSize, 1.0f);
-        float addressTextWidth = addressCharSize.x * (sizeof(addressText)-1);
+        Vector2 cellTextSize = MeasureTextEx(font, "0x00", cellFontSize, 1.0f);
+        Vector2 addressTextSize = MeasureTextEx(font, "0x0000", addressFontSize, 1.0f);
 
         srand(1337);
 
@@ -422,12 +390,12 @@ static int Slide6(void) {
           snprintf(cellText, sizeof(cellText), "0x%02X", byte);
           snprintf(addressText, sizeof(addressText), "0x%04X", address++);
           Vector2 textPos = {
-            cell.x + (cell.width  - cellTextWidth) * 0.5f,
-            cell.y + (cell.height - cellCharSize.y)    * 0.5f,
+            cell.x + (cell.width  - cellTextSize.x) * 0.5f,
+            cell.y + (cell.height - cellTextSize.y) * 0.5f,
           };
           Vector2 addressPos = {
-            cell.x + (cell.width - addressTextWidth - borderWidth) * 0.5f,
-            cell.y - (addressCharSize.y + 4.0f),
+            cell.x + (cell.width - addressTextSize.x) * 0.5f,
+            cell.y - (addressTextSize.y + 4.0f),
           };
           DrawRectangleLinesEx(cell, borderWidth, BLACK);
           DrawTextEx(font, cellText, textPos, cellFontSize, 1.0f, BLACK);
@@ -734,7 +702,7 @@ static int Slide12(void) {
 
       unsigned long value = strtoul(input, NULL, 0);
 
-      if (SlideSplitRemaining()) {
+      if (SlideSplitByPercent(0.8f)) {
         Font font = SlideShowGetFont(FONT_STYLE_MONOSPACED | FONT_STYLE_BOLD);
         Rectangle rect = SlideSplitRect();
         RegView(font,
@@ -744,6 +712,12 @@ static int Slide12(void) {
                 (const char* []) { "rax", "eax", "ax", "al" },
                 4,
                 showSeparator);
+
+        if (SlideSplitRemaining()) {
+          SlideText(
+            TextFormat("Premi `SPAZIO` per %s i separatori.", showSeparator ? "nascondere" : "mostrare")
+          );
+        }
       }
     }
   }
@@ -1014,7 +988,7 @@ static int Slide20(void) {
         CRGB(255, 161, 0)
         "~*ATTENZIONE*~\n"
         CRST()
-        "*Lo stack cresce verso il basso!*\n"
+        "*Lo stack cresce verso il basso ed è LIFO (`Last In First Out`)!*\n"
         "\n"
         "*NOTA*\n"
         "L'istruzione *`push`* decrementa il valore di `rsp` di `8` e successivamente copia il valore del registro "
@@ -1231,7 +1205,6 @@ static int Slide23(void) {
 
               if (SlideSplitRemaining()) {
                 /* Memory viewer */
-                DrawRectangleRec(SlideSplitRect(), BLACK);
               }
             }
           }
@@ -1251,26 +1224,32 @@ static int Slide23(void) {
 #define BOUNDS_FOR_BUTTON(i) ((Rectangle) { controlsRect.x, controlsRect.y + i * (buttonSize + 8.0f), buttonSize, buttonSize })
 
     GuiSetTooltip("Next register");
-    if (GuiButton(BOUNDS_FOR_BUTTON(3), "#115#")) ++activeReg;
+    if (GuiButton(BOUNDS_FOR_BUTTON(5), "#115#")) ++activeReg;
 
     GuiSetTooltip("Previous register");
-    if (GuiButton(BOUNDS_FOR_BUTTON(2), "#114#")) --activeReg;
+    if (GuiButton(BOUNDS_FOR_BUTTON(4), "#114#")) --activeReg;
 
     if /**/ (activeReg < 0) activeReg = NUM_REGS-1;
     else if (activeReg >= NUM_REGS) activeReg = 0;
 
-    GuiSetTooltip("Step instruction");
     if (debugger == NULL) GuiDisable();
     {
-      if (GuiButton(BOUNDS_FOR_BUTTON(1), "#115#") && debugger != NULL)
+      GuiSetTooltip("Step instruction");
+      if (GuiButton(BOUNDS_FOR_BUTTON(2), "#116#") && debugger != NULL)
         DebuggerStep(debugger);
+
+      GuiSetTooltip("Stop debugger");
+      if (GuiButton(BOUNDS_FOR_BUTTON(1), "#133#") && debugger != NULL) {
+        DebuggerFree(debugger);
+        debugger = NULL;
+      }
     }
     GuiEnable();
 
-    GuiSetTooltip("Run shellcode");
     if (debugger != NULL) GuiDisable();
     {
-      if (GuiButton(BOUNDS_FOR_BUTTON(0), "#131#")) {
+      GuiSetTooltip("Run shellcode");
+      if (GuiButton(BOUNDS_FOR_BUTTON(0), "#131#") && debugger == NULL) {
         char* src = CodeEditorGetText(codeEditor);
         if (!CompileAssembly(src, &debugger))
           TraceLog(LOG_ERROR, "Could not compile assembly:\n%s", src);
@@ -1286,6 +1265,137 @@ static int Slide23(void) {
 
 fail:
   return inhibitInput;
+}
+
+static int Slide24(void) {
+  if (!SlideBeginWithTitle(32.0f, "Il sistema operativo (1)"))
+    goto fail;
+
+  SlideText(
+    "Un *sistema operativo* è un insieme di programmi, che lavorano insieme per creare un "
+    "_livello di astrazione_ sull'hardware.\n"
+    "\n"
+    "Il sistema operativo:\n"
+    "- gestisce la memoria del computer\n"
+    "- gestisce i processi in esecuzione\n"
+    "- gestisce le operazioni di input/output (lettura/scrittura di file, ricezione/trasmissione dei pacchetti di internet, etc.)\n"
+    "\n"
+    "Per interagire con il sistema operativo si utilizzano le *system call*.\n"
+    "Le *system call* sono introdotte e gestite dal sistema operativo. Questo significa che _sistemi operativi "
+    "diversi definiscono system call diverse_."
+  );
+
+fail:
+  return 0;
+}
+
+static int Slide25(void) {
+  if (!SlideBeginWithTitle(32.0f, "Il sistema operativo (2)"))
+    goto fail;
+
+  SlideText(
+    "Per eseguire una _system call_ in assembly, si utilizza un'istruzione speciale definita dal sistema operativo.\n"
+    "Per esempio:\n"
+    "- `int 0x21` per MS-DOS\n"
+    "- `int 0x80` per Linux x86\n"
+    "- " CRGB(255, 0, 0) "*`syscall`*" CRST() " per i sistemi operativi per _x86\\_64_ (Linux, Windows, MacOS)\n"
+    "L'istruzione " CRGB(255, 0, 0) "*`syscall`*" CRST() " non ha operandi.\n"
+    "\n"
+    CRGB(255, 161, 0)
+    "~*ATTENZIONE*~\n"
+    CRGB(255, 0, 0)
+    "_Nel corso di CyberChallenge studieremo le system call di Linux per x86\\_64, "
+    "e utilizzeremo l'istruzione *`syscall`*_\n"
+    CRST()
+    "\n"
+    "Per eseguire una _system call_ su Linux per x86\\_64 è necessario:\n"
+    "- mettere il numero che identifica la system call in *`rax`*\n"
+    "- mettere i valori dei parametri nei registri corretti, che sono *`rdi, rsi, rdx, r10, r8, r9`*\n"
+    "- eseguire l'istruzione *`syscall`*\n"
+    "~Ogni system call può avere al massimo 6 parametri!~\n"
+  );
+
+fail:
+  return 0;
+}
+
+static int Slide26(void) {
+  if (!SlideBeginWithTitle(32.0f, "Il sistema operativo (3)"))
+    goto fail;
+
+  SlideText(
+    "Potete trovare una lista completa di tutte le system call di Linux a uno dei seguenti link:\n"
+    CRGB(32, 32, 255)
+    "~`https://syscalls.mebeim.net`~\n"
+    "~`https://x64.syscall.sh`~\n"
+    CRST()
+    "\n"
+    "Le system call principali sono:\n"
+    "- *`open`* apre un file. Prima di compiere un'azione di lettura e/o scrittura su un file, è necessario aprirlo.\n"
+    "- *`read`* legge dei byte da un file aperto.\n"
+    "- *`write`* scrive dei byte su un file aperto.\n"
+    "- *`execve`* esegue un programma.\n"
+    "\n"
+    "*NOTA*\n"
+    "Per infomazioni sui parametri e sul funzionamento di una _system call_, "
+    "potete fare riferimento al manuale tramite il comando (~per Linux~) `man (2) <nome syscall>`."
+  );
+
+fail:
+  return 0;
+}
+
+static int Slide27(void) {
+  if (!SlideBeginWithTitle(32.0f, "Il programma (1)"))
+    goto fail;
+
+  SlideText(
+    "Un programma non è formato solo da istruzioni, ma anche da dati (valori costanti, variabili globali, etc.).\n"
+    "Quando eseguiamo un programma, il _sistema operativo_ deve sapere in quale parte del file `.exe` si trovano le "
+    "istruzioni, in quale le costanti, etc, e potrebbe anche voler sapere ulteriori informazioni, come per esempio se "
+    "il programma è compatibile con la versione del sistema operativo.\n"
+    "\n"
+    "Per organizzare queste informazioni sono state create delle specifiche che descrivono la struttura che deve avere un "
+    "file eseguibile. Le specifiche principali sono:\n"
+    "- *`PE`* (per Windows)\n"
+    "- *`Mach-O`* (per MacOS)\n"
+    "- *`ELF`* (per Linux, BSD e pure PlayStation!)\n"
+    CRGB(255, 0, 0) "_*Nel corso di CyberChallenge studieremo solo il formato `ELF`.*_\n" CRST()
+    "\n"
+    "Un file *`ELF`* è diviso in sezioni. Le quattro principali sono:\n"
+    "- *`.text`* contiene le ~istruzioni~ del processore.\n"
+    "- *`.rodata`* contiene i ~valori costanti~ del programma.\n"
+    "- *`.data`* contiene le ~variabili globali inizializzate~ del programma.\n"
+    "- *`.bss`* contiene le ~variabili globali non-inizializzate~ del programma.\n"
+  );
+
+fail:
+  return 0;
+}
+
+static int Slide28(void) {
+  if (!SlideBeginWithTitle(32.0f, "Il programma (2)"))
+    goto fail;
+
+  SlideText(
+    "*Perché il programma è diviso in sezioni?*\n"
+    "Le varie parti del programma hanno bisogno di permessi diversi!\n"
+    "I permessi possono essere:\n"
+    "- *Readable* o lettura => La CPU può leggere il contenuto della sezione.\n"
+    "- *Writable* o scrittura => La CPU può sovrascrivere il contenuto della sezione.\n"
+    "- *Executable* o esecuzione => La CPU può eseguire le istruzioni presenti nella sezione.\n"
+    "Per comodità, questi permessi si abbreviano con `RWX`, inserendo un trattino nei permessi che non sono presenti. "
+    "Per esempio, `R-X` significa che la sezione è _readable_, _executable_, ma ~non~ _writable_.\n"
+    "\n"
+    "Le sezioni principali hanno i seguenti permessi:\n"
+    "- *`.text`*`   => R-X` (_readable_, _executable_)\n"
+    "- *`.rodata`*` => R--` (_readable_)\n"
+    "- *`.data`*`   => RW-` (_readable_, _writable_)\n"
+    "- *`.bss`*`    => RW-` (_readable_, _writable_)\n"
+  );
+
+fail:
+  return 0;
 }
 
 static int InitSS0(void) {
@@ -1342,7 +1452,12 @@ SLIDESHOW(
   Slide20,
   Slide21,
   Slide22,
-  Slide23
+  Slide23,
+  Slide24,
+  Slide25,
+  Slide26,
+  Slide27,
+  Slide28
 );
 
 SLIDESHOW_FONT_SIZES_DEFAULT();
